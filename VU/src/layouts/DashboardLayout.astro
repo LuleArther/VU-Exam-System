@@ -1,0 +1,105 @@
+---
+import Layout from './Layout.astro';
+import { Home, Folder, Video, Clock, BookOpen, FileText, CheckSquare, MessageCircle, Bell, User, LogOut } from 'lucide-react';
+
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+const currentPath = Astro.url.pathname;
+
+const navItems = [
+  { label: 'Home', icon: Home, href: '/dashboard' },
+  { label: 'My Modules', icon: Folder, href: '#' },
+  { label: 'Lectures', icon: Video, href: '#' },
+  { label: 'My Timetable', icon: Clock, href: '#' },
+  { label: 'Exams & Assessments', icon: BookOpen, href: '/exams' },
+  { label: 'Financial Statements', icon: FileText, href: '#' },
+  { label: 'VU Elections', icon: CheckSquare, href: '#' },
+  { label: 'Chats / Inquiries', icon: MessageCircle, href: '#' },
+];
+---
+<Layout title={title}>
+  <div class="flex h-screen bg-[#f9fafb] overflow-hidden font-sans">
+    <!-- Sidebar -->
+    <aside class="w-[260px] bg-[#f4f7f6] border-r border-slate-200 hidden md:flex flex-col flex-shrink-0">
+      <div class="p-6 flex items-center justify-center">
+        <!-- Logo -->
+        <a href="/dashboard">
+          <img src="/vu-logo.png" alt="Victoria University" class="h-[75px] object-contain" />
+        </a>
+      </div>
+      
+      <nav class="flex-1 mt-6 px-4 space-y-1 overflow-y-auto">
+        {navItems.map(item => {
+          const isActive = currentPath === item.href || (currentPath === '/' && item.href === '/dashboard');
+          return (
+          <a
+            href={item.href}
+            class={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-[14px] font-semibold transition-colors ${
+              isActive 
+                ? 'text-[#2c6fb7] bg-blue-50 relative' 
+                : 'text-slate-600 hover:text-[#2c6fb7] hover:bg-white'
+            }`}
+          >
+            {isActive && (
+              <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-red-600 rounded-r-md"></div>
+            )}
+            <item.icon className={`w-[22px] h-[22px] ${isActive ? 'text-[#2c6fb7] fill-blue-100' : 'text-slate-400'}`} strokeWidth={1.5} />
+            {item.label}
+          </a>
+        )})}
+      </nav>
+
+      <div class="px-4 py-6 border-t border-slate-200">
+        <button id="signout-button" class="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-[14px] font-semibold text-red-600 hover:bg-red-50 transition-colors">
+          <LogOut className="w-[22px] h-[22px]" strokeWidth={1.5} />
+          Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Wrapper -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+      <!-- Top header -->
+      <header class="bg-[#f9fafb] py-6 px-10 flex justify-between items-center z-10">
+        <div class="text-[15px] flex items-center">
+          <span id="header-student-name" class="font-bold text-slate-800 text-[17px] tracking-tight">Student</span>
+          <span class="text-slate-300 mx-3">|</span>
+          <span id="header-student-reg" class="text-slate-500 text-sm">VU-BIT-STUDENT &bull; VClass Student</span>
+        </div>
+      </header>
+
+      <!-- Scrollable Main Content -->
+      <main class="flex-1 overflow-y-auto px-10 pb-10">
+        <slot />
+      </main>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const name = localStorage.getItem('student_name');
+    const reg = localStorage.getItem('student_id');
+    if (name) {
+      const nameEl = document.getElementById('header-student-name');
+      if (nameEl) nameEl.textContent = name;
+    }
+    if (reg) {
+      const regEl = document.getElementById('header-student-reg');
+      if (regEl) regEl.innerHTML = `${reg} &bull; VClass Student`;
+    }
+
+    const signoutBtn = document.getElementById('signout-button');
+    if (signoutBtn) {
+      signoutBtn.addEventListener('click', () => {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('student_name');
+        localStorage.removeItem('student_id');
+        window.location.href = '/';
+      });
+    }
+  });
+</script>

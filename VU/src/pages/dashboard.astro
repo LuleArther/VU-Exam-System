@@ -1,0 +1,169 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import { ChevronLeft, ChevronRight, Folder, AlertCircle, Box } from 'lucide-react';
+---
+<DashboardLayout title="Student Dashboard">
+  
+  <div class="max-w-[1200px] mx-auto pb-12 w-full">
+    
+    <!-- Banner -->
+    <div class="bg-[#2c6fb7] rounded-xl p-10 text-white mb-8 shadow-sm">
+      <h1 class="text-[28px] font-bold mb-3 tracking-tight" id="dashboard-greeting">Good afternoon</h1>
+      <p class="text-blue-100/90 text-[16px] max-w-3xl leading-relaxed font-medium">
+        Your all-in-one platform for managing your studies and staying updated with university announcements. Explore the features and make the most of your learning experience
+      </p>
+      <div class="flex gap-2.5 mt-10">
+        <div class="h-1 w-10 bg-white rounded-full"></div>
+        <div class="h-1 w-10 bg-white/30 rounded-full"></div>
+        <div class="h-1 w-10 bg-white/30 rounded-full"></div>
+        <div class="h-1 w-10 bg-white/30 rounded-full"></div>
+      </div>
+    </div>
+
+    <!-- Main 2-column layout -->
+    <div class="grid grid-cols-1 xl:grid-cols-12 gap-8">
+      
+      <!-- Left Column (Modules, Attendance) -->
+      <div class="xl:col-span-8 space-y-8">
+        
+        <!-- My Modules -->
+        <section class="bg-[#f9fafb] rounded-xl pt-2 pb-6">
+          <h2 class="text-[#2c6fb7] text-[17px] font-bold mb-4">My Modules</h2>
+          <div class="relative flex items-center ml-2">
+            <button class="absolute -left-5 w-9 h-9 rounded-full bg-slate-200/60 flex items-center justify-center z-10 text-white/50 shadow-sm transition hover:bg-slate-300">
+              <ChevronLeft className="w-5 h-5 text-slate-500" strokeWidth={2.5} />
+            </button>
+            
+            <!-- Red Class Card -->
+            <div class="w-[280px] h-[160px] bg-[#d32f2f] rounded-xl p-6 text-white shadow-md flex flex-col justify-between hover:shadow-lg transition cursor-pointer">
+              <div class="bg-white/20 w-10 h-8 rounded-md flex items-center justify-center -mb-2">
+                <Folder className="w-5 h-5 text-white fill-white" strokeWidth={2} />
+              </div>
+              <div>
+                <h3 class="font-bold text-[15px] leading-snug mb-1">Database Management Systems 1</h3>
+                <p class="text-white/80 text-[13px] font-medium">(2102 ST)</p>
+              </div>
+            </div>
+            
+            <button class="absolute -right-5 w-9 h-9 rounded-full bg-slate-200/60 flex items-center justify-center z-10 text-slate-500 shadow-sm transition hover:bg-slate-300">
+              <ChevronRight className="w-5 h-5" strokeWidth={2.5} />
+            </button>
+          </div>
+        </section>
+
+        <!-- Under modules 2 cols: Attendance & Elections -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          
+          <!-- Attendance -->
+          <div class="bg-white rounded-xl shadow-sm border border-slate-100/[0.5] p-6 h-[320px] flex flex-col">
+            <h2 class="text-[#2c6fb7] text-[15px] font-bold mb-1">Class Attendance in last 7 days</h2>
+            <p class="text-slate-400 text-[11px] font-semibold mb-6">18th Mar 2026 - 25th Mar 2026</p>
+            
+            <div class="flex-1 relative flex">
+               <div class="absolute inset-0 flex flex-col justify-between text-[11px] text-slate-500 font-medium pb-6 pt-1">
+                 <div class="flex items-center gap-3"><span class="w-6 text-right">100</span><div class="h-px bg-slate-100 flex-1"></div></div>
+                 <div class="flex items-center gap-3"><span class="w-6 text-right">80</span><div class="h-px bg-slate-100 flex-1"></div></div>
+                 <div class="flex items-center gap-3"><span class="w-6 text-right">60</span><div class="h-px bg-slate-100 flex-1"></div></div>
+                 <div class="flex items-center gap-3"><span class="w-6 text-right">40</span><div class="h-px bg-slate-100 flex-1"></div></div>
+                 <div class="flex items-center gap-3"><span class="w-6 text-right">20</span><div class="h-px bg-slate-100 flex-1"></div></div>
+                 <div class="flex items-center gap-3"><span class="w-6 text-right">0</span><div class="h-px bg-slate-100 flex-1"></div></div>
+               </div>
+               <!-- Line chart mock -->
+               <div class="w-full pl-11 flex items-end relative z-10 pb-6">
+                 <div class="w-full h-px bg-[#3b82f6] shadow-[0_2px_4px_rgba(59,130,246,0.3)]"></div>
+               </div>
+            </div>
+          </div>
+          
+          <!-- Elections Poster Placeholder -->
+          <div class="bg-white rounded-xl overflow-hidden shadow-sm border border-slate-100 h-[320px] relative group cursor-pointer">
+             <div class="absolute inset-0 bg-gradient-to-br from-blue-50 to-slate-100 flex flex-col items-center justify-center p-6 text-center">
+                 <img src="/vu-logo.png" class="h-12 opacity-80 mb-4" />
+                 <h3 class="text-xl font-black text-slate-800 tracking-tighter shadow-sm mb-1 uppercase">Elections</h3>
+                 <span class="bg-[#2c6fb7] text-white text-[10px] font-bold px-3 py-1 rounded-full mb-4">Academic Year 2025/2026</span>
+                 <p class="text-[#d32f2f] font-black text-xl italic mb-2 tracking-tight">GRCs VOTE</p>
+                 <div class="bg-[#2c6fb7] text-white w-full rounded-md py-1.5 font-bold text-sm">FEBRUARY 17th and 18th</div>
+             </div>
+             <div class="absolute inset-x-0 bottom-0 bg-[#d32f2f] p-2.5 text-white text-[10px] flex justify-between font-medium items-center">
+                 <span class="flex items-center gap-1">&copy; Victoria University</span>
+                 <span>www.vu.ac.ug</span>
+             </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column (Alert, Calendar, Lectures) -->
+      <div class="xl:col-span-4 flex flex-col gap-6">
+        
+        <!-- Alert -->
+        <div class="bg-white rounded-xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-slate-100 relative">
+          <button class="absolute top-4 right-4 text-slate-300 hover:text-slate-600">
+             <span class="text-xl font-light">&times;</span>
+          </button>
+          <div class="flex gap-4 pr-4">
+             <div class="w-7 h-7 bg-orange-100 text-[#ea580c] rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+               <AlertCircle class="w-4 h-4" strokeWidth={2.5}/>
+             </div>
+             <div>
+               <h3 class="font-bold text-slate-900 text-[15px] mb-1">Change password</h3>
+               <p class="text-[13px] text-slate-600 leading-snug">You are using a default Password, Please click here to update your password.</p>
+             </div>
+          </div>
+        </div>
+
+        <!-- Calendar -->
+        <div class="bg-white rounded-xl px-6 py-5 shadow-sm border border-slate-100">
+           <div class="grid grid-cols-7 text-center text-[11px] font-bold text-slate-800 mb-5 tracking-wide">
+             <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span class="text-slate-400">Sat</span><span class="text-slate-400">Sun</span>
+           </div>
+           <div class="grid grid-cols-7 gap-y-6 text-center text-[13px] font-medium text-slate-700">
+             <span class="text-slate-300"></span><span class="text-slate-300"></span><span class="text-slate-300"></span><span class="text-slate-300"></span><span class="text-slate-300"></span><span class="text-slate-300"></span><span class="text-slate-400">1</span>
+             <span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span class="text-slate-400">7</span><span class="text-slate-400">8</span>
+             <span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span class="text-slate-400">14</span><span class="text-slate-400">15</span>
+             <span>16</span><span>17</span><span>18</span><span>19</span><span class="font-bold text-slate-900">20</span><span class="text-slate-400">21</span><span class="text-slate-400">22</span>
+             <span class="relative">23<div class="w-1.5 h-1.5 bg-[#2c6fb7] rounded-full absolute -bottom-2.5 left-1/2 -translate-x-1/2"></div></span>
+             <span class="relative flex justify-center">24<div class="w-1.5 h-1.5 bg-[#2c6fb7] rounded-full absolute -bottom-2.5 left-1/2 -translate-x-1/2"></div></span>
+             <span>25</span>
+             <div class="flex justify-center -mt-1"><span class="border border-[#2c6fb7] text-[#2c6fb7] rounded-lg w-7 h-7 flex items-center justify-center font-bold">26</span></div>
+             <span>27</span><span class="text-slate-400">28</span><span class="text-slate-400">29</span>
+             <span>30</span><span>31</span>
+           </div>
+        </div>
+
+        <!-- Lectures -->
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-100 min-h-[200px] flex flex-col">
+           <h2 class="text-[#2c6fb7] font-bold text-[15px]">Today's Lectures</h2>
+           <div class="flex-1 flex flex-col items-center justify-center text-center mt-4">
+              <div class="opacity-30 mb-4">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-slate-400">
+                   <path d="M2 12l10-8 10 8"></path>
+                   <path d="M22 12l-10 8-10-8"></path>
+                </svg>
+              </div>
+              <p class="text-slate-400 text-[13px] font-medium">You have no upcoming Lectures</p>
+           </div>
+        </div>
+        
+        <div class="text-right mt-auto">
+           <span class="text-slate-400 text-[11px] font-medium">Version 3.80</span>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</DashboardLayout>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const name = localStorage.getItem('student_name');
+    if (name) {
+      const parts = name.split(' ');
+      const firstName = parts.length > 0 ? parts[0] + ' ' + (parts.length > 1 ? parts[1] : '') : name;
+      
+      const greetingEl = document.getElementById('dashboard-greeting');
+      if (greetingEl) greetingEl.textContent = `Good afternoon ${firstName.trim()}`;
+    }
+  });
+</script>

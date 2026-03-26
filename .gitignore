@@ -1,0 +1,19 @@
+# Frontend
+VU/dist/
+VU/.astro/
+VU/node_modules/
+VU/npm-debug.log*
+VU/yarn-debug.log*
+VU/pnpm-debug.log*
+
+# Backend
+backend/venv/
+backend/__pycache__/
+backend/db.sqlite3
+backend/**/__pycache__/
+
+# Shared
+.env
+.env.production
+.DS_Store
+.idea/

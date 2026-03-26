@@ -1,0 +1,21 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import VerificationFlow from '../../components/exam/VerificationFlow';
+
+export function getStaticPaths() {
+  return [
+    { params: { id: 'COMP301' } },
+    { params: { id: 'DBMS201' } },
+    { params: { id: 'SWE402' } },
+  ];
+}
+
+const { id } = Astro.params;
+
+// Usually we'd fetch exam details if needed
+const examId = id || 'COMP301';
+---
+
+<Layout title="Identity Verification">
+  <VerificationFlow client:only="react" examId={examId} />
+</Layout>

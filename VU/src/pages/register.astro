@@ -1,0 +1,52 @@
+---
+import Layout from '../layouts/Layout.astro';
+import RegistrationForm from '../components/auth/RegistrationForm';
+---
+
+<Layout title="Victoria University | Register for VClass">
+  <main class="flex min-h-screen bg-slate-50">
+    
+    <!-- Left Panel: Registration Form -->
+    <div class="w-full lg:w-[500px] bg-white flex flex-col relative z-10 shadow-2xl lg:shadow-none">
+      
+      <div class="flex-1 flex flex-col justify-center px-8 sm:px-12 md:px-16 pt-12 pb-24">
+        
+        <!-- Logo Area -->
+        <div class="flex flex-col items-center mb-8">
+          <div class="flex items-center justify-center mb-6">
+            <img src="/vu-logo.png" alt="Victoria University Kampala Uganda Logo" class="h-[80px] object-contain" />
+          </div>
+          
+          <h1 class="text-[#1a365d] text-[20px] font-bold tracking-wide">VICTORIA UNIVERSITY</h1>
+          <h2 class="text-slate-500 text-[18px] mt-1 font-medium">Create Student Account</h2>
+        </div>
+
+        <RegistrationForm client:only="react" />
+
+      </div>
+
+      <!-- Online Payments Footer -->
+      <div class="py-6 flex justify-center border-t border-slate-100 mt-auto">
+        <a href="#" class="text-[#6b9bc2] font-semibold text-[15px] hover:text-[#5a8ab1] transition-colors">
+          Online Support
+        </a>
+      </div>
+    </div>
+
+    <!-- Right Panel: Cover Image -->
+    <div class="hidden lg:block relative flex-1 bg-slate-900 border-l border-slate-200">
+      <img 
+        src="/bg-login.jpg" 
+        alt="Students at Victoria University" 
+        class="absolute inset-0 w-full h-full object-cover"
+      />
+      <div class="absolute inset-0 bg-black/10 mix-blend-multiply"></div>
+      
+      <!-- Version Text -->
+      <div class="absolute bottom-4 right-6 text-white text-sm font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+        VClass Identity Setup
+      </div>
+    </div>
+    
+  </main>
+</Layout>

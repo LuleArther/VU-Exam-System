@@ -1,6 +1,6 @@
 ---
 import Layout from './Layout.astro';
-import { Home, Folder, Video, Clock, BookOpen, FileText, CheckSquare, MessageCircle, Bell, User, LogOut } from 'lucide-react';
+import { Home, Folder, Video, Clock, BookOpen, FileText, CheckSquare, MessageCircle, UserCog, LogOut } from 'lucide-react';
 
 interface Props {
   title: string;
@@ -15,6 +15,7 @@ const navItems = [
   { label: 'Lectures', icon: Video, href: '#' },
   { label: 'My Timetable', icon: Clock, href: '#' },
   { label: 'Exams & Assessments', icon: BookOpen, href: '/exams' },
+  { label: 'Settings', icon: UserCog, href: '/settings' },
   { label: 'Financial Statements', icon: FileText, href: '#' },
   { label: 'VU Elections', icon: CheckSquare, href: '#' },
   { label: 'Chats / Inquiries', icon: MessageCircle, href: '#' },

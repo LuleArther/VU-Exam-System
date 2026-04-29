@@ -129,10 +129,12 @@ Expected frontend URL:
 2. Register a student account and capture baseline photo
 3. Login and open dashboard
 4. Choose an exam and continue
+5. If your camera is dark or your image is not recognized well, open **Settings** and update your reference image with a clearer photo
 
 Notes:
 - If face match is low, the system now gives a warning and lets the student continue.
 - If face is not detected for 1 minute during exam, the student gets a warning.
+- If you have a low-light camera, you can still try registration, but updating the reference image later with a clearer photo is recommended.
 
 ## Common Issues and Quick Fixes
 
@@ -156,6 +158,18 @@ Notes:
 ```bat
 pip install tf-keras
 ```
+
+## Updating Your Photo Later
+
+If the image you used during registration is too dark or unclear:
+
+1. Sign in to the portal
+2. Open **Settings** from the side menu
+3. Enter your password
+4. Capture a new picture or upload a clearer photo
+5. Click **Update Reference Image**
+
+This replaces the old reference image so the system can recognize you more reliably.
 
 ## How to Push Your Local Changes to GitHub
 

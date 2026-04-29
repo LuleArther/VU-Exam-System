@@ -1,0 +1,87 @@
+---
+import Layout from '../layouts/Layout.astro';
+import LoginForm from '../components/auth/LoginForm';
+---
+
+<Layout title="Victoria University | Student's Portal">
+  <main class="flex min-h-screen bg-slate-50">
+    
+    <!-- Left Panel: Login Form -->
+    <div class="w-full lg:w-[500px] bg-white flex flex-col relative z-10 shadow-2xl lg:shadow-none">
+      
+      <div class="flex-1 flex flex-col justify-center px-8 sm:px-12 md:px-16 pt-12 pb-24">
+        
+        <!-- Logo Area -->
+        <div class="flex flex-col items-center mb-10">
+          <div class="flex items-center justify-center mb-6">
+            <img src="/vu-logo.png" alt="Victoria University Kampala Uganda Logo" class="h-[100px] object-contain" />
+          </div>
+          
+          <h1 class="text-[#1a365d] text-[22px] font-bold tracking-wide">VICTORIA UNIVERSITY</h1>
+          <h2 class="text-slate-500 text-[19px] mt-1 font-medium">Student's Portal</h2>
+        </div>
+
+          <div class="mb-6">
+            <h3 class="text-slate-800 font-bold text-[15px]">Enter your details to login</h3>
+          </div>
+
+          <LoginForm client:load />
+
+      </div>
+
+      <!-- Online Payments Footer -->
+      <div class="py-6 flex justify-center border-t border-slate-100 mt-auto">
+        <a href="#" class="text-[#6b9bc2] font-semibold text-[15px] hover:text-[#5a8ab1] transition-colors">
+          Online Payments
+        </a>
+      </div>
+    </div>
+
+    <!-- Right Panel: Cover Image -->
+    <div class="hidden lg:block relative flex-1 bg-slate-900 border-l border-slate-200">
+      <img 
+        src="/bg-login.jpg" 
+        alt="Graduation Ceremony" 
+        class="absolute inset-0 w-full h-full object-cover"
+      />
+      <!-- Blue tint overlay could go here if needed, but original image seems raw with vivid reds/blues -->
+      <div class="absolute inset-0 bg-black/5 mix-blend-multiply"></div>
+      
+      <!-- Version Text -->
+      <div class="absolute bottom-4 right-6 text-white text-sm font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+        Version 3.80
+      </div>
+    </div>
+    
+  </main>
+</Layout>
+
+<style>
+  /* Customizing the checkbox to match the screenshot more closely */
+  input[type="checkbox"] {
+    appearance: none;
+    background-color: #fff;
+    margin: 0;
+    font: inherit;
+    color: currentColor;
+    border: 2px solid #64748b;
+    border-radius: 4px;
+    display: grid;
+    place-content: center;
+  }
+
+  input[type="checkbox"]::before {
+    content: "";
+    width: 0.65em;
+    height: 0.65em;
+    transform: scale(0);
+    transition: 120ms transform ease-in-out;
+    box-shadow: inset 1em 1em #64748b;
+    transform-origin: center;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  }
+
+  input[type="checkbox"]:checked::before {
+    transform: scale(1);
+  }
+</style>

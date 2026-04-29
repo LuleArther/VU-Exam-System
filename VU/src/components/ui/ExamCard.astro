@@ -1,0 +1,71 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { Calendar, Clock, ChevronRight, FileText, CheckCircle2 } from 'lucide-react';
+
+export interface Props {
+  title: string;
+  courseCode: string;
+  date: string;
+  duration: string;
+  status: 'upcoming' | 'active' | 'completed';
+  id: string;
+}
+
+const { title, courseCode, date, duration, status, id } = Astro.props;
+
+const statusStyles = {
+  upcoming: 'bg-slate-100 text-slate-800 border-slate-200',
+  active: 'bg-green-50 text-green-700 border-green-200 ring-1 ring-green-500',
+  completed: 'bg-slate-50 text-slate-500 border-slate-200 opacity-75'
+};
+---
+
+<div class={`bg-white rounded-xl border p-5 shadow-sm transition-all hover:shadow-md ${statusStyles[status]}`}>
+  <div class="flex justify-between items-start mb-4">
+    <div>
+      <div class="flex items-center space-x-2 mb-1">
+        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-indigo-100 text-indigo-800">
+          {courseCode}
+        </span>
+        {status === 'active' && (
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800 animate-pulse">
+            Live Now
+          </span>
+        )}
+      </div>
+      <h3 class="text-lg font-bold text-slate-900 border-none m-0 p-0 leading-tight">{title}</h3>
+    </div>
+    <div class="p-2 bg-indigo-50 rounded-lg text-indigo-600">
+      <FileText className="w-5 h-5" />
+    </div>
+  </div>
+  
+  <div class="space-y-2 mb-6">
+    <div class="flex items-center text-sm text-slate-600">
+      <Calendar className="w-4 h-4 mr-2 text-slate-400" />
+      <span>{date}</span>
+    </div>
+    <div class="flex items-center text-sm text-slate-600">
+      <Clock className="w-4 h-4 mr-2 text-slate-400" />
+      <span>{duration}</span>
+    </div>
+  </div>
+  
+  <div class="pt-4 border-t border-slate-100">
+    {status === 'active' ? (
+      <a href={`/verify/${id}`} class="w-full inline-flex justify-center items-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors">
+        Enter Exam
+        <ChevronRight className="w-4 h-4 ml-1" />
+      </a>
+    ) : status === 'upcoming' ? (
+      <button disabled class="w-full inline-flex justify-center items-center py-2 px-4 border border-slate-200 rounded-lg text-sm font-medium text-slate-400 bg-slate-50 cursor-not-allowed">
+        Waiting to Start
+      </button>
+    ) : (
+      <div class="w-full inline-flex justify-center items-center py-2 px-4 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-slate-50">
+        <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" />
+        Completed
+      </div>
+    )}
+  </div>
+</div>

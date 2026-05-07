@@ -20,8 +20,14 @@ export const ALL: APIRoute = async ({ request, params }) => {
       body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.text() : undefined,
     });
 
+    // Vercel's Edge CDN intercepts 500-level status codes from serverless functions
+    // and overrides the body with a generic HTML error page.
+    // To ensure the frontend receives the actual JSON error message from the droplet,
+    // we rewrite any 500-level status down to 400.
+    const safeStatus = response.status >= 500 ? 400 : response.status;
+
     return new Response(response.body, {
-      status: response.status,
+      status: safeStatus,
       statusText: response.statusText,
       headers: response.headers
     });

@@ -151,6 +151,10 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
+echo [OK] Frontend compatibility check...
+echo     Astro uses a Vite 7 override to avoid dev-server 500 errors.
+echo     If you update frontend dependencies, rerun npm install so the lockfile stays in sync.
+
 REM Return to root
 cd ..
 
@@ -172,7 +176,7 @@ echo   cd VU
 echo   npm run dev
 echo.
 echo The system will be available at:
-echo   Frontend: http://localhost:3000 (or shown by Astro)
+echo   Frontend: http://localhost:4321 (or shown by Astro)
 echo   API: http://localhost:8000/api
 echo.
 pause

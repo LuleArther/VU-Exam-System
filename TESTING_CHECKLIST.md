@@ -83,10 +83,10 @@ Use this checklist to verify that your VU Exam System installation is working co
   ```bash
   cd VU
   npm run dev
-  # Should show: "Local: http://localhost:3000" (or similar port)
+  # Should show: "Local: http://localhost:4321" (or similar port)
   ```
 - [ ] No build errors or warnings
-- [ ] Server responds on http://localhost:3000 (or shown port)
+- [ ] Server responds on the frontend URL shown by Astro (typically http://localhost:4321)
 
 ### React Components
 - [ ] Component files exist:
@@ -96,9 +96,9 @@ Use this checklist to verify that your VU Exam System installation is working co
   - [ ] `VU/src/components/auth/RegistrationForm.tsx`
 
 ### Pages Load
-- [ ] Homepage loads: http://localhost:3000
-- [ ] Register page loads: http://localhost:3000/register
-- [ ] Dashboard page loads: http://localhost:3000/dashboard (after login)
+- [ ] Homepage loads: the frontend URL shown by Astro
+- [ ] Register page loads: the frontend URL shown by Astro, typically `http://localhost:4321/register`
+- [ ] Dashboard page loads: the frontend URL shown by Astro, typically `http://localhost:4321/dashboard` (after login)
 
 ## Integration Testing
 
@@ -229,7 +229,7 @@ Use this checklist to verify that your VU Exam System installation is working co
 ### Complete Flow Test
 1. [ ] Start backend server
 2. [ ] Start frontend server
-3. [ ] Open http://localhost:3000 in browser
+3. [ ] Open the frontend URL shown by Astro in browser
 4. [ ] Click "Register"
 5. [ ] Enter test credentials
 6. [ ] Allow camera permission

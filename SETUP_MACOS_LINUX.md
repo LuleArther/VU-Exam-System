@@ -107,6 +107,7 @@ The script will:
 - ✓ Install Python dependencies
 - ✓ Setup Django database
 - ✓ Install Node packages
+- ✓ Apply the Vite 7 compatibility override used by the Astro frontend
 
 **Wait time**: 5-10 minutes
 
@@ -163,7 +164,9 @@ npm install
 npm run dev
 ```
 
-Frontend will be at: **http://localhost:3000** (or as shown by Astro)
+Frontend will be at: **http://localhost:4321** (or as shown by Astro)
+
+If the frontend shows a blank page or 500 errors for Astro runtime assets, rerun `npm install` in [VU](VU/) so the Vite 7 override in [VU/package.json](VU/package.json) is refreshed.
 
 ---
 
@@ -185,7 +188,7 @@ python manage.py runserver
 cd VU
 npm run dev
 
-# Available at: http://localhost:3000
+# Available at: http://localhost:4321
 ```
 
 ### Terminal 3 - Optional: Admin Access
@@ -482,7 +485,7 @@ If you prefer containerization:
 docker-compose up
 
 # Backend: http://localhost:8000
-# Frontend: http://localhost:3000
+# Frontend: http://localhost:4321
 ```
 
 ---
@@ -607,7 +610,7 @@ WantedBy=multi-user.target
 Next steps:
 1. Start the backend: `python manage.py runserver`
 2. Start the frontend: `npm run dev`
-3. Open http://localhost:3000 in your browser
+3. Open the frontend URL shown by Astro in your browser
 4. Create a test student account
 5. Test the exam verification system
 

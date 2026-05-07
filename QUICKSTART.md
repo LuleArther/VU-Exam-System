@@ -24,7 +24,7 @@ python manage.py runserver
 cd VU
 npm run dev
 
-# Visit: http://localhost:3000
+# Visit: http://localhost:4321 (or shown by Astro)
 ```
 
 **📖 Full guide**: [WINDOWS_SETUP.md](WINDOWS_SETUP.md)
@@ -53,7 +53,7 @@ python manage.py runserver
 cd VU
 npm run dev
 
-# Visit: http://localhost:3000
+# Visit: http://localhost:4321 (or shown by Astro)
 ```
 
 **📖 Full guide**: [SETUP_MACOS_LINUX.md](SETUP_MACOS_LINUX.md)
@@ -85,7 +85,7 @@ python manage.py runserver
 cd VU
 npm run dev
 
-# Visit: http://localhost:3000
+# Visit: http://localhost:4321 (or shown by Astro)
 ```
 
 **📖 Full guide**: [SETUP_MACOS_LINUX.md](SETUP_MACOS_LINUX.md)
@@ -103,6 +103,7 @@ The `setup.sh` (macOS/Linux) and `setup.bat` (Windows) scripts automatically:
 ✅ Set up database migrations
 ✅ Install Node.js packages
 ✅ Create `.env` configuration file
+✅ Keep Astro compatible with the installed Vite major version
 
 **No manual steps needed!** The scripts handle everything.
 
@@ -125,17 +126,17 @@ python manage.py runserver
 ```bash
 cd VU
 npm run dev
-# Server on: http://localhost:3000
+# Server on: http://localhost:4321 (or shown by Astro)
 ```
 
 **Browser**:
-Open http://localhost:3000 and use the system!
+Open the frontend URL shown by Astro and use the system!
 
 ---
 
 ## First Test
 
-1. Go to http://localhost:3000
+1. Go to the frontend URL shown by Astro
 2. Click "Register"
 3. Fill in form with test data
 4. Allow camera permission
@@ -158,7 +159,7 @@ All environment variables are in: `backend/.env`
 SECRET_KEY=...
 DEBUG=True
 ALLOWED_HOSTS=localhost
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:4321
 ```
 
 For development, the defaults work fine.
@@ -222,7 +223,7 @@ vu-exam-system/
 ## Architecture
 
 ```
-Frontend (http://localhost:3000)
+Frontend (http://localhost:4321)
     ↓ API calls
 Backend (http://localhost:8000)
     ↓

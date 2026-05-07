@@ -103,6 +103,10 @@ npm run dev
 - [Architecture](docs/ARCHITECTURE.md) - System design overview
 - [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and fixes
 
+### Frontend Compatibility Note
+
+The frontend is pinned to Vite 7 in [VU/package.json](VU/package.json) to avoid Astro dev-server 500s such as `Missing field moduleType`. If that error returns, rerun `npm install` in `VU/`.
+
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -119,7 +123,7 @@ ALLOWED_HOSTS=localhost,127.0.0.1
 # DATABASE_URL=postgresql://user:password@localhost:5432/vudb
 
 # Frontend
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:4321
 
 # DeepFace settings
 DEEPFACE_MODEL=Facenet512
@@ -146,7 +150,7 @@ python manage.py migrate
 ### For Students
 
 1. **Register**
-   - Go to `http://localhost:3000/register`
+   - Go to the frontend URL shown by Astro, usually `http://localhost:4321/register`
    - Provide registration number, name, password
    - Upload/capture student ID photo
    - Click "Register"
@@ -254,7 +258,7 @@ See [SECURITY.md](docs/SECURITY.md) for detailed security hardening guide.
 docker-compose up
 
 # Backend will be at: http://localhost:8000
-# Frontend will be at: http://localhost:3000
+# Frontend will be at: http://localhost:4321
 
 # Run migrations inside container
 docker-compose exec web python manage.py migrate

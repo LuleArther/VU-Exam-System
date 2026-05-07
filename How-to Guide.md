@@ -121,11 +121,11 @@ py -m http.server 3000
 Leave this terminal open.
 
 Expected frontend URL:
-- http://localhost:3000
+- http://localhost:4321
 
 ## Step 5: Use the System
 
-1. Open browser and go to http://localhost:3000
+1. Open browser and go to the frontend URL shown by Astro
 2. Register a student account and capture baseline photo
 3. Login and open dashboard
 4. Choose an exam and continue
@@ -140,7 +140,7 @@ Notes:
 
 1. "Failed to fetch"
 - Confirm backend is running on http://localhost:8000
-- Confirm frontend is running on http://localhost:3000
+- Confirm frontend is running on the URL shown by Astro
 
 2. Camera not working
 - Allow camera permission in browser
@@ -190,4 +190,4 @@ If Git asks for authentication:
 
 ## Done
 
-If both servers are running and browser opens localhost:3000, the system is installed correctly.
+If both servers are running and the browser opens the frontend URL shown by Astro, the system is installed correctly.

@@ -113,7 +113,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*', cast=Csv())
 SECRET_KEY=your-secret-key-here-change-in-production
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1,*.example.com
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:4321
 DEEPFACE_MODEL=Facenet512
 DEEPFACE_ENFORCE_DETECTION=True
 ```
@@ -366,7 +366,7 @@ After setup, users should:
 
 1. ✅ Start backend: `python manage.py runserver`
 2. ✅ Start frontend: `npm run dev`
-3. ✅ Visit http://localhost:3000
+3. ✅ Visit the frontend URL shown by Astro, typically http://localhost:4321
 4. ✅ Test registration
 5. ✅ Test face verification
 6. ✅ Check admin dashboard

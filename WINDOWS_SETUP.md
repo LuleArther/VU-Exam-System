@@ -71,6 +71,7 @@ The script will:
 - ✓ Set up the Django database
 - ✓ Install Node.js packages
 - ✓ Create configuration files
+- ✓ Apply the Vite 7 compatibility override used by the Astro frontend
 
 **Wait time**: 5-10 minutes (TensorFlow downloads are large)
 
@@ -129,7 +130,9 @@ npm install
 npm run dev
 ```
 
-The frontend will be available at: **http://localhost:3000** (or shown by Astro)
+The frontend will be available at: **http://localhost:4321** (or shown by Astro)
+
+If the frontend shows a blank page or 500 errors for Astro runtime assets, rerun `npm install` in [VU](VU/) so the Vite 7 override in [VU/package.json](VU/package.json) is refreshed.
 
 ---
 
@@ -207,7 +210,7 @@ These libraries need C++ build tools on Windows.
 1. Check if browser has permission:
    - Chrome: Settings → Privacy → Site settings → Camera
    - Edge: Settings → Privacy → Permissions → Camera
-2. Grant permission to `localhost:3000` and `localhost:8000`
+2. Grant permission to the frontend URL shown by Astro and `localhost:8000`
 3. Make sure camera isn't in use by another app
 4. Try refreshing the page: `Ctrl+Shift+R` (hard refresh)
 
@@ -263,7 +266,7 @@ python manage.py runserver
 cd VU
 npm run dev
 
-# Astro dev server runs on http://localhost:3000
+# Astro dev server runs on http://localhost:4321
 ```
 
 ### Terminal 3 - Optional: Database/Admin
@@ -286,7 +289,7 @@ After setup, verify everything works:
 - [ ] Backend runs: `python manage.py runserver`
 - [ ] Frontend starts: `npm run dev`
 - [ ] API responds: Visit `http://localhost:8000/api/`
-- [ ] Register page loads: Visit `http://localhost:3000/register`
+- [ ] Register page loads: Visit the frontend URL shown by Astro, typically `http://localhost:4321/register`
 - [ ] Database initialized: Check `backend/db.sqlite3` exists
 - [ ] Static files served: Check CSS/JS load in browser
 - [ ] Webcam permission granted in browser

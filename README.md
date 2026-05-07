@@ -267,6 +267,17 @@ docker-compose exec web python manage.py migrate
 docker-compose exec web python manage.py createsuperuser
 ```
 
+## 🌊 DigitalOcean App Platform
+
+This repository is a monorepo, so auto-detection can fail if DigitalOcean scans only the root.
+Use the included app spec at `.do/app.yaml`, which explicitly sets:
+
+- Frontend source directory: `VU`
+- Backend source directory: `backend`
+
+When creating the App Platform app, select this repository and deploy using the detected
+`.do/app.yaml` spec so components are created correctly.
+
 ## 📊 Performance Tuning
 
 ### For Large-Scale Deployments

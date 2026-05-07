@@ -112,7 +112,10 @@ def verify_face(request):
             }
         )
 
-        # Decode base64 to temp file
+        import cv2
+        import numpy as np
+        
+        # Decode base64 to temp file and also decode with cv2 for DeepFace
         try:
             if "," in image_b64:
                 _, encoded = image_b64.split(",", 1)
@@ -123,8 +126,15 @@ def verify_face(request):
             temp_img_path = os.path.join(TEMP_DIR, f"temp_{reg_number}.jpg")
             with open(temp_img_path, "wb") as f:
                 f.write(decoded)
+                
+            # Verify the image is readable by OpenCV
+            nparr = np.frombuffer(decoded, np.uint8)
+            img_cv2 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            if img_cv2 is None:
+                return Response({"error": f"Failed to decode image from webcam. The captured image data is invalid or empty. Size: {len(decoded)} bytes."}, status=status.HTTP_400_BAD_REQUEST)
+                
         except Exception as e:
-            return Response({"error": "Invalid base64 image formatting"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": f"Invalid base64 image formatting: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         import traceback
         from django.http import JsonResponse
@@ -135,11 +145,11 @@ def verify_face(request):
         # In a real app we need an absolute path to the pre-uploaded reference image
         ref_path = student.reference_image_path
         if not os.path.exists(ref_path):
-            return Response({"error": f"Student reference image missing on server at {ref_path}"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": f"Student reference image missing on server. Please re-register your account."}, status=status.HTTP_404_NOT_FOUND)
 
         # Run Verification
         result = DeepFace.verify(
-            img1_path=temp_img_path, 
+            img1_path=img_cv2, 
             img2_path=ref_path, 
             model_name="Facenet512",
             enforce_detection=True
@@ -199,6 +209,9 @@ def verify_continuous(request):
         }
     )
 
+    import cv2
+    import numpy as np
+
     try:
         if "," in image_b64:
             _, encoded = image_b64.split(",", 1)
@@ -209,16 +222,22 @@ def verify_continuous(request):
         temp_img_path = os.path.join(TEMP_DIR, f"cont_{reg_number}.jpg")
         with open(temp_img_path, "wb") as f:
             f.write(decoded)
+            
+        nparr = np.frombuffer(decoded, np.uint8)
+        img_cv2 = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img_cv2 is None:
+            return Response({"error": "Failed to decode continuous frame"}, status=status.HTTP_400_BAD_REQUEST)
+            
     except Exception:
         return Response({"error": "Invalid base64"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         ref_path = student.reference_image_path
         if not os.path.exists(ref_path):
-            return Response({"error": "Ref image missing"}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Ref image missing. Please re-register."}, status=status.HTTP_404_NOT_FOUND)
 
         result = DeepFace.verify(
-            img1_path=temp_img_path, 
+            img1_path=img_cv2, 
             img2_path=ref_path, 
             model_name="Facenet512",
             enforce_detection=True

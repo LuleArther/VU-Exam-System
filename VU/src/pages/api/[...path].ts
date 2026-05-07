@@ -7,9 +7,10 @@ export const ALL: APIRoute = async ({ request, params }) => {
   
   // Clean up the path to prevent double slashes
   const cleanPath = rawPath.replace(/^\/+/, '').replace(/\/+$/, '');
+  const searchParams = url.search ? url.search : '';
 
   // Construct the target URL to the DigitalOcean Droplet
-  const targetUrl = `${DROPLET_IP}/api/${cleanPath}/${url.search}`;
+  const targetUrl = `${DROPLET_IP}/api/${cleanPath}/${searchParams}`;
   
   // Clone headers but remove host and referer to prevent conflicts
   const headers = new Headers(request.headers);

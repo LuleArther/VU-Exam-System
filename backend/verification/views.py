@@ -84,49 +84,51 @@ def login(request):
 
 @api_view(['POST'])
 def verify_face(request):
-    """
-    Expects JSON:
-    {
-       "registration_number": "VU-BIT-2503-1728-DAY",
-       "exam_id": "COMP301",
-       "image_base64": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
-    }
-    """
-    if not DeepFace:
-        return Response({"error": "DeepFace backend is not installed on this server. Please deploy via Docker."}, status=status.HTTP_501_NOT_IMPLEMENTED)
-
-    reg_number = request.data.get('registration_number')
-    exam_id = request.data.get('exam_id')
-    image_b64 = request.data.get('image_base64')
-
-    if not all([reg_number, exam_id, image_b64]):
-        return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
-
-    student = get_object_or_404(Student, registration_number=reg_number)
-    
-    from django.utils import timezone
-    exam, _ = Exam.objects.get_or_create(
-        exam_id=exam_id,
-        defaults={
-            'title': f'{exam_id} Final Examination',
-            'date': timezone.now(),
-            'duration_minutes': 120
-        }
-    )
-
-    # Decode base64 to temp file
     try:
-        if "," in image_b64:
-            _, encoded = image_b64.split(",", 1)
-        else:
-            encoded = image_b64
-        
-        decoded = base64.b64decode(encoded)
-        temp_img_path = os.path.join(TEMP_DIR, f"temp_{reg_number}.jpg")
-        with open(temp_img_path, "wb") as f:
-            f.write(decoded)
+        if not DeepFace:
+            return Response({"error": "DeepFace backend is not installed on this server. Please deploy via Docker."}, status=status.HTTP_501_NOT_IMPLEMENTED)
+
+        reg_number = request.data.get('registration_number')
+        exam_id = request.data.get('exam_id')
+        image_b64 = request.data.get('image_base64')
+
+        if not all([reg_number, exam_id, image_b64]):
+            return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
-        return Response({"error": "Invalid base64 image formatting"}, status=status.HTTP_400_BAD_REQUEST)
+        import traceback
+        from django.http import JsonResponse
+        return JsonResponse({"error_from_wrapper": str(e), "trace": traceback.format_exc()}, status=500)
+
+    try:
+        student = get_object_or_404(Student, registration_number=reg_number)
+        
+        from django.utils import timezone
+        exam, _ = Exam.objects.get_or_create(
+            exam_id=exam_id,
+            defaults={
+                'title': f'{exam_id} Final Examination',
+                'date': timezone.now(),
+                'duration_minutes': 120
+            }
+        )
+
+        # Decode base64 to temp file
+        try:
+            if "," in image_b64:
+                _, encoded = image_b64.split(",", 1)
+            else:
+                encoded = image_b64
+            
+            decoded = base64.b64decode(encoded)
+            temp_img_path = os.path.join(TEMP_DIR, f"temp_{reg_number}.jpg")
+            with open(temp_img_path, "wb") as f:
+                f.write(decoded)
+        except Exception as e:
+            return Response({"error": "Invalid base64 image formatting"}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        import traceback
+        from django.http import JsonResponse
+        return JsonResponse({"error_from_wrapper2": str(e), "trace": traceback.format_exc()}, status=500)
 
     try:
         # Check if reference image exists

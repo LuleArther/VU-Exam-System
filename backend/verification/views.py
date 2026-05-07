@@ -1,5 +1,10 @@
 import base64
 import os
+import shutil
+import tempfile
+from pathlib import Path
+
+import numpy as np
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -12,10 +17,84 @@ except ImportError:
 
 from .models import Student, Exam, ExamLog
 
-TEMP_DIR = "/tmp/deepface_verify"
-STUDENTS_DIR = "/tmp/students_reference"
-os.makedirs(TEMP_DIR, exist_ok=True)
-os.makedirs(STUDENTS_DIR, exist_ok=True)
+# Cross-platform temp directories
+BASE_TEMP_DIR = Path(tempfile.gettempdir())
+TEMP_DIR = BASE_TEMP_DIR / "deepface_verify"
+STUDENTS_DIR = BASE_TEMP_DIR / "students_reference"
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
+STUDENTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _extract_base64_payload(image_b64):
+    if "," in image_b64:
+        _, encoded = image_b64.split(",", 1)
+    else:
+        encoded = image_b64
+    return encoded
+
+
+def _save_base64_image(image_b64, target_path):
+    encoded = _extract_base64_payload(image_b64)
+    decoded = base64.b64decode(encoded)
+    with open(target_path, "wb") as file_handle:
+        file_handle.write(decoded)
+    return target_path
+
+
+def _enhance_image_for_low_light(source_path, target_path):
+    try:
+        import cv2
+
+        image = cv2.imread(str(source_path))
+        if image is None:
+            raise ValueError(f"Could not read image at {source_path}")
+
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        brightness = float(np.mean(gray))
+
+        lab_image = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+        l_channel, a_channel, b_channel = cv2.split(lab_image)
+        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        l_channel = clahe.apply(l_channel)
+        enhanced = cv2.merge((l_channel, a_channel, b_channel))
+        enhanced = cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
+
+        if brightness < 110:
+            gamma = 1.35
+            inverse_gamma = 1.0 / gamma
+            table = np.array([(index / 255.0) ** inverse_gamma * 255 for index in range(256)]).astype("uint8")
+            enhanced = cv2.LUT(enhanced, table)
+
+        cv2.imwrite(str(target_path), enhanced)
+        return target_path
+    except Exception:
+        # If OpenCV or numpy native bindings are unavailable or processing fails,
+        # fall back to copying the raw image so registration can proceed.
+        try:
+            shutil.copy2(str(source_path), str(target_path))
+            return target_path
+        except Exception as e:
+            raise
+
+
+def _prepare_image_for_deepface(source_path, prefix):
+    raw_path = TEMP_DIR / f"{prefix}_raw.jpg"
+    processed_path = TEMP_DIR / f"{prefix}_processed.jpg"
+    shutil.copy2(str(source_path), str(raw_path))
+    _enhance_image_for_low_light(raw_path, processed_path)
+    return raw_path, processed_path
+
+
+def _deepface_module():
+    from deepface import DeepFace
+
+    return DeepFace
+
+
+def _verification_payload(distance, threshold, success_message, failure_message):
+    match_percentage = max(0, min(100, 100 - (distance * 100)))
+    verified = distance <= threshold
+    return verified, round(match_percentage, 2)
 
 @api_view(['POST'])
 def register(request):

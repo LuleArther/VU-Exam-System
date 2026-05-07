@@ -1,9 +1,21 @@
 Django==5.0.3
 djangorestframework==3.15.1
 django-cors-headers==4.3.1
+python-decouple==3.8
+
+# Database
+# psycopg2-binary==2.9.9  # For PostgreSQL (production only) - requires PostgreSQL dev tools
+# Using SQLite for development - uncomment psycopg2-binary for PostgreSQL
+
+# Server
 gunicorn==21.2.0
-psycopg2-binary==2.9.9
-deepface>=0.0.93
+
+# Computer Vision & AI
+# deepface==0.0.99  # Requires TensorFlow - temporarily disabled for Python 3.14 compatibility
 opencv-python-headless==4.9.0.80
-tensorflow==2.21.0
-tf-keras==2.21.0
+
+# TensorFlow (CPU version for better cross-platform compatibility)
+# GPU users should install tensorflow[and-cuda] separately
+# NOTE: Commenting out TensorFlow temporarily due to Python 3.14 incompatibility
+# tensorflow will need to be installed separately when Python support is available
+# tensorflow==2.16.1

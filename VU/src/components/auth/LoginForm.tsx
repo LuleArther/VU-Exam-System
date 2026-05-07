@@ -14,7 +14,7 @@ export default function LoginForm() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://167.99.7.208:8000/api/login/', {
+      const response = await fetch('/api/login/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ registration_number: regNo, password: password })

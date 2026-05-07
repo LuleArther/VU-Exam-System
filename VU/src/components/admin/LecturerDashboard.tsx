@@ -21,7 +21,7 @@ export default function LecturerDashboard() {
   const fetchLogs = async () => {
     try {
       // Fetch from DigitalOcean droplet API
-      const res = await fetch('http://142.93.49.161:8000/api/dashboard-logs/');
+      const res = await fetch('http://167.99.7.208:8000/api/dashboard-logs/');
       if (res.ok) {
          const data = await res.json();
          setLogs(data.logs);

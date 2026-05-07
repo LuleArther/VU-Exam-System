@@ -279,7 +279,7 @@ export default function ExamInterface({ examId }: { examId: string }) {
                     const regNumber = localStorage.getItem('student_id');
                     if (!regNumber) return;
 
-                    const res = await fetch('http://142.93.49.161:8000/api/verify-continuous/', {
+                    const res = await fetch('http://167.99.7.208:8000/api/verify-continuous/', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({

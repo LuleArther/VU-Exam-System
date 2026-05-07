@@ -16,7 +16,7 @@ export default function VerificationFlow({ examId }: VerifyFlowProps) {
     
     try {
       const regNumber = localStorage.getItem('student_id') || 'VU-BIT-2503-1728-DAY';
-      const response = await fetch('http://142.93.49.161:8000/api/verify-face/', {
+      const response = await fetch('http://167.99.7.208:8000/api/verify-face/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

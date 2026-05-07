@@ -246,7 +246,7 @@ def dashboard_logs(request):
     """
     Returns all exam logs for the dashboard.
     """
-    logs = ExamLog.objects.select_related('student', 'exam').all().order_by('-timestamp')
+    logs = ExamLog.objects.select_related('student', 'exam').all().order_by('-last_verified_at')
     data = []
     for log in logs:
         data.append({
@@ -255,7 +255,7 @@ def dashboard_logs(request):
             "registration_number": log.student.registration_number,
             "exam_id": log.exam.exam_id,
             "exam_name": log.exam.title,
-            "timestamp": log.timestamp.isoformat(),
+            "timestamp": log.last_verified_at.isoformat(),
             "verification_attempts": log.verification_attempts,
             "impersonation_flags": log.impersonation_flags,
             "is_verified": log.is_verified,

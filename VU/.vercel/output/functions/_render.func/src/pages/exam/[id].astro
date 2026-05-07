@@ -1,0 +1,21 @@
+---
+import ExamLayout from '../../layouts/ExamLayout.astro';
+import ExamInterface from '../../components/exam/ExamInterface';
+
+export function getStaticPaths() {
+  return [
+    { params: { id: 'COMP301' } },
+    { params: { id: 'DBMS201' } },
+    { params: { id: 'SWE402' } },
+  ];
+}
+
+const { id } = Astro.params;
+
+// Usually we'd fetch exam details if needed. For UI it's fine.
+const examId = id || 'COMP301';
+---
+
+<ExamLayout title={`${examId} - Final Examination`}>
+  <ExamInterface client:only="react" examId={examId} />
+</ExamLayout>

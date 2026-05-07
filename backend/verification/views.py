@@ -60,6 +60,61 @@ def register(request):
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['POST'])
+def update_profile(request):
+    try:
+        reg_number = request.data.get('registration_number')
+        full_name = request.data.get('full_name')
+        password = request.data.get('password')
+        image_b64 = request.data.get('image_base64')
+
+        if not reg_number:
+            return Response({"error": "Registration number is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            student = Student.objects.get(registration_number=reg_number)
+        except Student.DoesNotExist:
+            return Response({"error": "Student not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Update full name if provided
+        if full_name and full_name.strip():
+            student.full_name = full_name.strip()
+
+        # Update password if provided
+        if password and password.strip():
+            student.set_password(password.strip())
+
+        # Update reference image if provided
+        if image_b64:
+            if "," in image_b64:
+                _, encoded = image_b64.split(",", 1)
+            else:
+                encoded = image_b64
+                
+            try:
+                decoded = base64.b64decode(encoded)
+                # Overwrite the existing reference image path
+                ref_path = student.reference_image_path
+                # Ensure the directory exists just in case
+                os.makedirs(os.path.dirname(ref_path), exist_ok=True)
+                
+                with open(ref_path, "wb") as f:
+                    f.write(decoded)
+            except Exception as e:
+                return Response({"error": f"Failed to save new baseline image: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        student.save()
+
+        return Response({
+            "success": True, 
+            "message": "Profile updated successfully.",
+            "student_name": student.full_name
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        import traceback
+        return Response({"error": str(e), "trace": traceback.format_exc()}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['POST'])
 def login(request):
     data = request.data
     reg_number = data.get('registration_number')

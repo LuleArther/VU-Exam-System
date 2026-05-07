@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import verify_face, register, login, verify_continuous, dashboard_logs
+from .views import verify_face, register, login, verify_continuous, dashboard_logs, update_profile
 
 urlpatterns = [
     path('verify-face/', verify_face, name='verify_face'),
@@ -7,4 +7,5 @@ urlpatterns = [
     path('dashboard-logs/', dashboard_logs, name='dashboard_logs'),
     path('register/', register, name='register'),
     path('login/', login, name='login'),
+    path('update-profile/', update_profile, name='update_profile'),
 ]

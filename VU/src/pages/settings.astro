@@ -1,0 +1,17 @@
+---
+import DashboardLayout from '../layouts/DashboardLayout.astro';
+import SettingsForm from '../components/profile/SettingsForm';
+---
+
+<DashboardLayout title="Profile Settings | Victoria University">
+  <div class="max-w-[1200px] mx-auto py-8">
+    <div class="mb-8">
+      <h1 class="text-2xl font-bold text-slate-800 tracking-tight">Account Settings</h1>
+      <p class="text-slate-500 mt-1">Manage your student profile and verification credentials</p>
+    </div>
+
+    <!-- React Form Component -->
+    <SettingsForm client:load />
+
+  </div>
+</DashboardLayout>

@@ -1,11 +1,15 @@
 import type { APIRoute } from 'astro';
 
 export const ALL: APIRoute = async ({ request, params }) => {
-  const path = params.path || '';
+  const DROPLET_IP = 'http://167.99.7.208:8000';
+  const rawPath = params.path || '';
   const url = new URL(request.url);
   
+  // Clean up the path to prevent double slashes
+  const cleanPath = rawPath.replace(/^\/+/, '').replace(/\/+$/, '');
+
   // Construct the target URL to the DigitalOcean Droplet
-  const targetUrl = `http://167.99.7.208:8000/api/${path}${url.search}`;
+  const targetUrl = `${DROPLET_IP}/api/${cleanPath}/${url.search}`;
   
   // Clone headers but remove host and referer to prevent conflicts
   const headers = new Headers(request.headers);

@@ -5,4 +5,5 @@ gunicorn==21.2.0
 psycopg2-binary==2.9.9
 deepface>=0.0.93
 opencv-python-headless==4.9.0.80
-tf-keras==2.16.0
+tensorflow==2.21.0
+tf-keras==2.21.0

@@ -10,9 +10,6 @@ services:
     routes:
       - path: /api
       - path: /admin
-      - path: /media
-      - path: /static
-      - path: /
 
 static_sites:
   - name: frontend

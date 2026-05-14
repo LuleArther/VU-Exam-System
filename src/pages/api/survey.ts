@@ -1,8 +1,10 @@
 import type { APIRoute } from 'astro';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
 const VALID_ROLES = new Set(['student', 'lecturer', 'administrator', 'other']);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -22,12 +24,17 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
+    if (!EMAIL_PATTERN.test(String(payload.email).trim())) {
+      return new Response(JSON.stringify({ error: 'Invalid email address.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     const resultsDir = join(process.cwd(), 'survey-results');
     await mkdir(resultsDir, { recursive: true });
 
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).slice(2, 10);
-    const fileName = `survey-${timestamp}-${randomSuffix}.json`;
+    const fileName = `survey-${Date.now()}-${randomUUID()}.json`;
     const filePath = join(resultsDir, fileName);
 
     const record = {
@@ -41,7 +48,8 @@ export const POST: APIRoute = async ({ request }) => {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
-  } catch {
+  } catch (error) {
+    console.error('Failed to save survey response:', error);
     return new Response(JSON.stringify({ error: 'Failed to save survey response.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

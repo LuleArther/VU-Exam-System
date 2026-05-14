@@ -6,7 +6,18 @@ import { join } from 'node:path';
 const VALID_ROLES = new Set(['student', 'lecturer', 'administrator', 'other']);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESULTS_DIR = join(process.cwd(), 'survey-results');
-const RESULTS_DIR_READY = mkdir(RESULTS_DIR, { recursive: true });
+let resultsDirReady: Promise<void> | null = null;
+
+const ensureResultsDir = async () => {
+  if (!resultsDirReady) {
+    resultsDirReady = mkdir(RESULTS_DIR, { recursive: true }).catch((error) => {
+      resultsDirReady = null;
+      throw error;
+    });
+  }
+
+  await resultsDirReady;
+};
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -33,9 +44,10 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    await RESULTS_DIR_READY;
+    await ensureResultsDir();
 
-    const fileName = `survey-${randomUUID()}.json`;
+    const submissionId = randomUUID();
+    const fileName = `survey-${submissionId}.json`;
     const filePath = join(RESULTS_DIR, fileName);
 
     const record = {
@@ -45,7 +57,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     await writeFile(filePath, `${JSON.stringify(record, null, 2)}\n`, 'utf-8');
 
-    return new Response(JSON.stringify({ success: true, file: `survey-results/${fileName}` }), {
+    return new Response(JSON.stringify({ success: true, submissionId }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

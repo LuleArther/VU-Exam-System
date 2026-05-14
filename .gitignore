@@ -17,3 +17,5 @@ backend/**/__pycache__/
 .env.production
 .DS_Store
 .idea/
+node_modules/
+survey-results/*.json

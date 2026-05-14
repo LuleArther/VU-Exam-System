@@ -1,0 +1,209 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="BigClass Survey">
+  <main class="min-h-screen bg-slate-50 py-10 px-4">
+    <div class="mx-auto max-w-3xl rounded-2xl bg-white shadow-xl border border-slate-200 overflow-hidden">
+      <div class="bg-[#1a365d] text-white px-8 py-8">
+        <div class="flex items-center gap-4">
+          <img src="/vu-logo.png" alt="Victoria University logo" class="h-16 w-auto object-contain bg-white rounded-md p-2" />
+          <div>
+            <h1 class="text-2xl font-bold">Victoria University BigClass Survey</h1>
+            <p class="text-slate-100 text-sm mt-1">Help us improve the experience for students, lecturers, administrators, and other users.</p>
+          </div>
+        </div>
+      </div>
+
+      <form id="survey-form" class="p-8 space-y-6">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="block">
+            <span class="text-sm font-semibold text-slate-700">Full name</span>
+            <input name="fullName" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1a365d]" />
+          </label>
+
+          <label class="block">
+            <span class="text-sm font-semibold text-slate-700">Email</span>
+            <input type="email" name="email" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1a365d]" />
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="text-sm font-semibold text-slate-700">Your role in BigClass</span>
+          <select id="role" name="role" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1a365d]">
+            <option value="">Select your role</option>
+            <option value="student">Student</option>
+            <option value="lecturer">Lecturer</option>
+            <option value="administrator">Administrator</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+
+        <section id="student-questions" class="role-questions hidden rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
+          <h2 class="font-semibold text-slate-800">Student questions</h2>
+          <label class="block">
+            <span class="text-sm text-slate-700">How easy is it to submit coursework?</span>
+            <select name="studentCourseworkEase" data-role-required="student" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 bg-white">
+              <option value="">Select</option>
+              <option>Very easy</option>
+              <option>Easy</option>
+              <option>Neutral</option>
+              <option>Difficult</option>
+              <option>Very difficult</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-sm text-slate-700">What is your biggest challenge as a student?</span>
+            <textarea name="studentChallenge" data-role-required="student" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
+          </label>
+        </section>
+
+        <section id="lecturer-questions" class="role-questions hidden rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
+          <h2 class="font-semibold text-slate-800">Lecturer questions</h2>
+          <label class="block">
+            <span class="text-sm text-slate-700">How effective are BigClass grading tools?</span>
+            <select name="lecturerGradingTools" data-role-required="lecturer" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 bg-white">
+              <option value="">Select</option>
+              <option>Excellent</option>
+              <option>Good</option>
+              <option>Average</option>
+              <option>Poor</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-sm text-slate-700">What teaching feature should be improved?</span>
+            <textarea name="lecturerFeatureRequest" data-role-required="lecturer" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
+          </label>
+        </section>
+
+        <section id="administrator-questions" class="role-questions hidden rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
+          <h2 class="font-semibold text-slate-800">Administrator questions</h2>
+          <label class="block">
+            <span class="text-sm text-slate-700">How manageable is user administration?</span>
+            <select name="adminUserManagement" data-role-required="administrator" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 bg-white">
+              <option value="">Select</option>
+              <option>Very manageable</option>
+              <option>Manageable</option>
+              <option>Neutral</option>
+              <option>Hard to manage</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-sm text-slate-700">What admin workflow needs improvement?</span>
+            <textarea name="adminWorkflowIssue" data-role-required="administrator" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
+          </label>
+        </section>
+
+        <section id="other-questions" class="role-questions hidden rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
+          <h2 class="font-semibold text-slate-800">Other user questions</h2>
+          <label class="block">
+            <span class="text-sm text-slate-700">Please describe your role</span>
+            <input name="otherRole" data-role-required="other" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+          </label>
+          <label class="block">
+            <span class="text-sm text-slate-700">What do you use BigClass for?</span>
+            <textarea name="otherUseCase" data-role-required="other" rows="3" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
+          </label>
+        </section>
+
+        <div class="rounded-xl bg-slate-50 border border-slate-200 p-4 space-y-3">
+          <h2 class="font-semibold text-slate-800">General feedback</h2>
+          <label class="block">
+            <span class="text-sm text-slate-700">Overall experience with BigClass</span>
+            <select name="overallExperience" required class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 bg-white">
+              <option value="">Select</option>
+              <option>Excellent</option>
+              <option>Good</option>
+              <option>Average</option>
+              <option>Poor</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-sm text-slate-700">Additional comments</span>
+            <textarea name="comments" rows="4" class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"></textarea>
+          </label>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button id="submit-btn" type="submit" class="inline-flex items-center justify-center rounded-lg bg-[#1a365d] px-5 py-2.5 text-white font-semibold hover:bg-[#132a47] transition-colors">
+            Submit survey
+          </button>
+          <p id="status-message" class="text-sm text-slate-600"></p>
+        </div>
+      </form>
+    </div>
+  </main>
+</Layout>
+
+<script is:inline>
+  const form = document.getElementById('survey-form');
+  const roleSelect = document.getElementById('role');
+  const statusMessage = document.getElementById('status-message');
+  const submitBtn = document.getElementById('submit-btn');
+  const roleSections = document.querySelectorAll('.role-questions');
+  const roleFields = document.querySelectorAll('[data-role-required]');
+
+  const refreshRoleSections = () => {
+    const selectedRole = roleSelect.value;
+    roleSections.forEach((section) => {
+      section.classList.toggle('hidden', section.id !== `${selectedRole}-questions`);
+    });
+
+    roleFields.forEach((field) => {
+      field.required = field.dataset.roleRequired === selectedRole;
+    });
+  };
+
+  roleSelect.addEventListener('change', refreshRoleSections);
+  refreshRoleSections();
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    statusMessage.textContent = '';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting...';
+
+    const formData = new FormData(form);
+    const payload = {
+      fullName: formData.get('fullName'),
+      email: formData.get('email'),
+      role: formData.get('role'),
+      overallExperience: formData.get('overallExperience'),
+      comments: formData.get('comments'),
+      roleAnswers: {
+        studentCourseworkEase: formData.get('studentCourseworkEase'),
+        studentChallenge: formData.get('studentChallenge'),
+        lecturerGradingTools: formData.get('lecturerGradingTools'),
+        lecturerFeatureRequest: formData.get('lecturerFeatureRequest'),
+        adminUserManagement: formData.get('adminUserManagement'),
+        adminWorkflowIssue: formData.get('adminWorkflowIssue'),
+        otherRole: formData.get('otherRole'),
+        otherUseCase: formData.get('otherUseCase')
+      }
+    };
+
+    try {
+      const response = await fetch('/api/survey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const body = await response.json();
+      if (!response.ok) {
+        throw new Error(body.error || 'Failed to submit survey');
+      }
+
+      statusMessage.textContent = `Survey submitted successfully. Saved to ${body.file}.`;
+      statusMessage.className = 'text-sm text-green-700';
+      form.reset();
+      refreshRoleSections();
+    } catch (error) {
+      statusMessage.textContent = error.message || 'Submission failed.';
+      statusMessage.className = 'text-sm text-red-700';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit survey';
+    }
+  });
+</script>

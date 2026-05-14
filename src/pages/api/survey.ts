@@ -6,17 +6,25 @@ import { join } from 'node:path';
 const VALID_ROLES = new Set(['student', 'lecturer', 'administrator', 'other']);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const RESULTS_DIR = join(process.cwd(), 'survey-results');
-let resultsDirReady: Promise<void> | null = null;
+const ALLOWED_ROLE_ANSWER_FIELDS = [
+  'studentCourseworkEase',
+  'studentChallenge',
+  'lecturerGradingTools',
+  'lecturerFeatureRequest',
+  'adminUserManagement',
+  'adminWorkflowIssue',
+  'otherRole',
+  'otherUseCase'
+] as const;
 
-const ensureResultsDir = async () => {
-  if (!resultsDirReady) {
-    resultsDirReady = mkdir(RESULTS_DIR, { recursive: true }).catch((error) => {
-      resultsDirReady = null;
-      throw error;
-    });
+const sanitizeRoleAnswers = (raw: unknown) => {
+  const source = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+  const roleAnswers: Record<string, string> = {};
+  for (const field of ALLOWED_ROLE_ANSWER_FIELDS) {
+    const value = source[field];
+    roleAnswers[field] = typeof value === 'string' ? value.trim() : '';
   }
-
-  await resultsDirReady;
+  return roleAnswers;
 };
 
 export const POST: APIRoute = async ({ request }) => {
@@ -49,7 +57,7 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    await ensureResultsDir();
+    await mkdir(RESULTS_DIR, { recursive: true });
 
     const submissionId = randomUUID();
     const fileName = `survey-${submissionId}.json`;
@@ -62,7 +70,7 @@ export const POST: APIRoute = async ({ request }) => {
       role,
       overallExperience,
       comments,
-      roleAnswers: payload?.roleAnswers ?? {}
+      roleAnswers: sanitizeRoleAnswers(payload?.roleAnswers)
     };
 
     await writeFile(filePath, `${JSON.stringify(record, null, 2)}\n`, 'utf-8');

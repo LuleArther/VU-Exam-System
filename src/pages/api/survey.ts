@@ -22,22 +22,27 @@ const ensureResultsDir = async () => {
 export const POST: APIRoute = async ({ request }) => {
   try {
     const payload = await request.json();
+    const fullName = String(payload?.fullName ?? '').trim();
+    const email = String(payload?.email ?? '').trim();
+    const role = String(payload?.role ?? '').trim();
+    const overallExperience = String(payload?.overallExperience ?? '').trim();
+    const comments = String(payload?.comments ?? '').trim();
 
-    if (!payload?.fullName || !payload?.email || !payload?.role || !payload?.overallExperience) {
+    if (!fullName || !email || !role || !overallExperience) {
       return new Response(JSON.stringify({ error: 'Missing required survey fields.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    if (!VALID_ROLES.has(payload.role)) {
+    if (!VALID_ROLES.has(role)) {
       return new Response(JSON.stringify({ error: 'Invalid survey role.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    if (!EMAIL_PATTERN.test(String(payload.email).trim())) {
+    if (!EMAIL_PATTERN.test(email)) {
       return new Response(JSON.stringify({ error: 'Invalid email address.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -52,7 +57,12 @@ export const POST: APIRoute = async ({ request }) => {
 
     const record = {
       submittedAt: new Date().toISOString(),
-      ...payload
+      fullName,
+      email,
+      role,
+      overallExperience,
+      comments,
+      roleAnswers: payload?.roleAnswers ?? {}
     };
 
     await writeFile(filePath, `${JSON.stringify(record, null, 2)}\n`, 'utf-8');

@@ -5,6 +5,8 @@ import { join } from 'node:path';
 
 const VALID_ROLES = new Set(['student', 'lecturer', 'administrator', 'other']);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const RESULTS_DIR = join(process.cwd(), 'survey-results');
+const RESULTS_DIR_READY = mkdir(RESULTS_DIR, { recursive: true });
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -31,11 +33,10 @@ export const POST: APIRoute = async ({ request }) => {
       });
     }
 
-    const resultsDir = join(process.cwd(), 'survey-results');
-    await mkdir(resultsDir, { recursive: true });
+    await RESULTS_DIR_READY;
 
-    const fileName = `survey-${Date.now()}-${randomUUID()}.json`;
-    const filePath = join(resultsDir, fileName);
+    const fileName = `survey-${randomUUID()}.json`;
+    const filePath = join(RESULTS_DIR, fileName);
 
     const record = {
       submittedAt: new Date().toISOString(),

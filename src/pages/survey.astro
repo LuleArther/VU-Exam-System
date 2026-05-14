@@ -194,7 +194,7 @@ import Layout from '../layouts/Layout.astro';
         throw new Error(body.error || 'Failed to submit survey');
       }
 
-      statusMessage.textContent = `Survey submitted successfully. Saved to ${body.file}.`;
+      statusMessage.textContent = 'Survey submitted successfully. Thank you for your feedback.';
       statusMessage.className = 'text-sm text-green-700';
       form.reset();
       refreshRoleSections();

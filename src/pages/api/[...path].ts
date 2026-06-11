@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 
 export const ALL: APIRoute = async ({ request, params }) => {
-  const DROPLET_IP = 'http://167.99.7.208:8000';
+  const DROPLET_IP = import.meta.env.BACKEND_URL || 'http://127.0.0.1:8000';
   const rawPath = params.path || '';
   const url = new URL(request.url);
   

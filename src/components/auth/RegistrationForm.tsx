@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, CheckCircle2, ChevronRight, XCircle } from 'lucide-react';
+import { Camera, CheckCircle2, ChevronRight, XCircle, Mail, ArrowRight, ShieldAlert } from 'lucide-react';
 
 const videoConstraints = {
   width: 1280,
@@ -11,6 +11,7 @@ const videoConstraints = {
 export default function RegistrationForm() {
   const [step, setStep] = useState(1);
   const [regNo, setRegNo] = useState('');
+  const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   
@@ -19,6 +20,11 @@ export default function RegistrationForm() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Verification code flow state
+  const [verificationCode, setVerificationCode] = useState('');
+  const [targetEmail, setTargetEmail] = useState('');
+  const [demoCode, setDemoCode] = useState('');
 
   const capture = useCallback(() => {
     const image = webcamRef.current?.getScreenshot();
@@ -33,7 +39,7 @@ export default function RegistrationForm() {
 
   const nextStep = (e: React.FormEvent) => {
     e.preventDefault();
-    if (regNo && fullName && password) {
+    if (regNo && email && fullName && password) {
       setStep(2);
     }
   };
@@ -53,6 +59,7 @@ export default function RegistrationForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           registration_number: regNo,
+          email: email,
           full_name: fullName,
           password: password,
           base64_image: imageSrc
@@ -63,6 +70,14 @@ export default function RegistrationForm() {
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to register.');
+      }
+
+      if (data.verification_required) {
+        setTargetEmail(data.email);
+        setDemoCode(data.debug_code || '');
+        setStep(3);
+        setLoading(false);
+        return;
       }
 
       // Save token and jump to dashboard
@@ -77,12 +92,45 @@ export default function RegistrationForm() {
     }
   };
 
+  const handleVerificationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await fetch('/api/verify-registration-code/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration_number: regNo, code: verificationCode })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid verification code.');
+      }
+
+      // Save credentials and redirect
+      localStorage.setItem('auth_token', data.token);
+      localStorage.setItem('student_name', data.student_name);
+      localStorage.setItem('student_id', regNo);
+      localStorage.setItem('role', 'student');
+
+      window.location.href = '/dashboard';
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="w-full">
       <div className="mb-6 flex items-center justify-between text-sm font-semibold">
         <span className={step === 1 ? "text-[#2c6fb7]" : "text-slate-400"}>1. Account Details</span>
         <ChevronRight className="w-4 h-4 text-slate-300" />
         <span className={step === 2 ? "text-[#2c6fb7]" : "text-slate-400"}>2. Baseline Verification</span>
+        <ChevronRight className="w-4 h-4 text-slate-300" />
+        <span className={step === 3 ? "text-[#2c6fb7]" : "text-slate-400"}>3. Email Verification</span>
       </div>
 
       {error && (
@@ -101,6 +149,17 @@ export default function RegistrationForm() {
               required
               value={regNo}
               onChange={(e) => setRegNo(e.target.value)}
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded text-[14px] text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+            />
+          </div>
+          <div>
+            <label className="block text-[13px] text-slate-600 font-semibold mb-1">Email Address</label>
+            <input 
+              type="email" 
+              placeholder="e.g student@vu.ac.ug" 
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 bg-white border border-slate-200 rounded text-[14px] text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
             />
           </div>
@@ -200,6 +259,58 @@ export default function RegistrationForm() {
             </div>
           )}
         </div>
+      )}
+
+      {step === 3 && (
+        <form className="space-y-4" onSubmit={handleVerificationSubmit}>
+          <div className="mb-4">
+            <div className="w-12 h-12 bg-blue-50 text-[#2c6fb7] rounded-xl flex items-center justify-center mb-3">
+              <Mail className="w-6 h-6" />
+            </div>
+            <h3 className="text-slate-800 font-bold text-[18px] tracking-tight">Email Verification</h3>
+            <p className="text-slate-500 text-[13px] mt-1">
+              We have sent a verification code to your registered school email address <strong className="text-slate-700">{targetEmail}</strong>.
+            </p>
+          </div>
+
+          {/* Developer Demo Toast */}
+          {demoCode && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-lg text-[13px] flex items-center justify-between shadow-sm animate-pulse">
+              <div>
+                <strong>Demo Tip:</strong> Verification code is <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded font-bold">{demoCode}</span>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setVerificationCode(demoCode)}
+                className="text-[#2c6fb7] hover:underline font-bold text-xs"
+              >
+                Autofill
+              </button>
+            </div>
+          )}
+
+          <div>
+            <input 
+              type="text" 
+              placeholder="Enter 6-Digit Code" 
+              required
+              maxLength={6}
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg text-center font-bold tracking-widest text-[20px] placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors placeholder:text-sm placeholder:tracking-normal"
+            />
+          </div>
+
+          <div className="pt-2 flex flex-col gap-3">
+            <button 
+              type="submit" 
+              disabled={loading || verificationCode.length !== 6}
+              className="w-full py-[12px] px-4 border border-transparent rounded-lg text-[14px] font-bold text-white bg-[#2c6fb7] hover:bg-[#1a5ba0] transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              {loading ? 'Verifying...' : <>Verify and Access <ArrowRight className="w-4 h-4" /></>}
+            </button>
+          </div>
+        </form>
       )}
     </div>
   );

@@ -10,8 +10,10 @@ class Student(models.Model):
     reference_image_path = models.CharField(max_length=255)
     
     # Auth fields
+    email = models.EmailField(unique=True, null=True, blank=True)
     password = models.CharField(max_length=128, default="")
     auth_token = models.CharField(max_length=100, null=True, blank=True)
+    is_active = models.BooleanField(default=False)
 
     def set_password(self, raw_password):
         self.password = make_password(raw_password)
@@ -32,6 +34,9 @@ class Exam(models.Model):
     title = models.CharField(max_length=150)
     date = models.DateTimeField()
     duration_minutes = models.IntegerField(default=120)
+    exam_type = models.CharField(max_length=20, default='objective')
+    questions_json = models.TextField(default='[]')
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.title
@@ -46,5 +51,23 @@ class ExamLog(models.Model):
     # For continuous monitoring flags
     impersonation_flags = models.IntegerField(default=0)
 
+    # Extended details
+    status = models.CharField(max_length=20, default='started')
+    answers_json = models.TextField(default='{}')
+    score = models.FloatField(default=0.0)
+    grade_letter = models.CharField(max_length=5, default='')
+    feedback = models.TextField(default='')
+    timeline_json = models.TextField(default='[]')
+    started_at = models.DateTimeField(null=True, blank=True)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
     def __str__(self):
         return f"{self.student.registration_number} - {self.exam.exam_id}"
+
+class OTPVerification(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"OTP for {self.student.registration_number}"

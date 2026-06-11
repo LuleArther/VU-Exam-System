@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import { Camera, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Camera, CheckCircle, AlertCircle, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface WebcamMonitorProps {
   onCapture: (imageSrc: string) => void;
@@ -8,6 +8,7 @@ interface WebcamMonitorProps {
   status: 'idle' | 'verifying' | 'success' | 'failed';
   continuousMode?: boolean;
   continuousInterval?: number;
+  onNoCameraBypass?: () => void;
 }
 
 const videoConstraints = {
@@ -16,18 +17,31 @@ const videoConstraints = {
   facingMode: "user"
 };
 
-export default function WebcamMonitor({ onCapture, isVerifying, status, continuousMode = false, continuousInterval = 30000 }: WebcamMonitorProps) {
+export default function WebcamMonitor({ 
+  onCapture, 
+  isVerifying, 
+  status, 
+  continuousMode = false, 
+  continuousInterval = 30000,
+  onNoCameraBypass
+}: WebcamMonitorProps) {
   const webcamRef = useRef<Webcam>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const onCaptureRef = useRef(onCapture);
+  
+  useEffect(() => {
+    onCaptureRef.current = onCapture;
+  }, [onCapture]);
 
   const capture = useCallback(() => {
     if (webcamRef.current) {
       const imageSrc = webcamRef.current.getScreenshot();
       if (imageSrc) {
-        onCapture(imageSrc);
+        onCaptureRef.current(imageSrc);
       }
     }
-  }, [webcamRef, onCapture]);
+  }, [webcamRef]);
 
   useEffect(() => {
     if (continuousMode && !error) {
@@ -39,7 +53,7 @@ export default function WebcamMonitor({ onCapture, isVerifying, status, continuo
   }, [continuousMode, continuousInterval, error, capture]);
 
   const handleUserMediaError = useCallback((error: string | DOMException) => {
-    setError("Camera access denied or unavailable. Please check permissions.");
+    setError("Camera access denied or unavailable. No working webcam detected on this device.");
     console.error("Webcam error:", error);
   }, []);
 
@@ -47,10 +61,22 @@ export default function WebcamMonitor({ onCapture, isVerifying, status, continuo
     <div className="flex flex-col items-center max-w-2xl w-full mx-auto p-4">
       <div className="relative w-full overflow-hidden bg-slate-100 rounded-2xl shadow-inner border-2 border-slate-200 aspect-video flex items-center justify-center">
         {error ? (
-          <div className="flex flex-col items-center justify-center text-slate-500 p-8 text-center bg-red-50 w-full h-full">
-            <Camera className="w-12 h-12 text-red-400 mb-3" />
-            <p className="font-medium text-red-600 mb-1">{error}</p>
-            <p className="text-sm text-red-500">Please grant camera permissions and reload.</p>
+          <div className="flex flex-col items-center justify-center text-slate-500 p-8 text-center bg-red-50/50 w-full h-full">
+            <AlertTriangle className="w-12 h-12 text-red-500 mb-3" />
+            <h4 className="font-bold text-red-700 text-lg mb-1">Warning: No Camera Detected!</h4>
+            <p className="text-sm text-red-600 max-w-md mb-6 leading-relaxed">
+              Please connect a wireless camera or use a better device with an integrated camera. 
+              Taking the exam without a working camera will flag your session and you may lose credibility marks.
+            </p>
+            {onNoCameraBypass && (
+              <button
+                type="button"
+                onClick={onNoCameraBypass}
+                className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-sm shadow-md transition-colors"
+              >
+                Proceed without Camera (Lose Marks)
+              </button>
+            )}
           </div>
         ) : (
           <Webcam

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import WebcamMonitor from './WebcamMonitor';
-import { ArrowLeft, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, ShieldAlert, Sparkles, HelpCircle } from 'lucide-react';
 
 interface VerifyFlowProps {
   examId: string;
@@ -9,13 +9,46 @@ interface VerifyFlowProps {
 export default function VerificationFlow({ examId }: VerifyFlowProps) {
   const [status, setStatus] = useState<'idle' | 'verifying' | 'success' | 'failed'>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const regNumber = localStorage.getItem('student_id') || 'VU-BIT-2503-1728-DAY';
+
+  // Helper to log event and redirect
+  const startExamAndRedirect = async (skipReason?: string) => {
+    setStatus('success');
+    try {
+      // 1. Initialize exam session
+      await fetch(`/api/exams/${examId}/start/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration_number: regNumber })
+      });
+
+      // 2. If skipped, log it
+      if (skipReason) {
+        await fetch(`/api/exams/${examId}/log-event/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            registration_number: regNumber,
+            event: "Verification Bypassed",
+            details: `Student bypassed verification. Reason: ${skipReason}`
+          })
+        });
+      }
+    } catch (err) {
+      console.error("Error setting up exam log:", err);
+    }
+    
+    setTimeout(() => {
+      window.location.href = `/exam/${examId}`;
+    }, 1500);
+  };
   
   const handleCapture = async (imageSrc: string) => {
     setStatus('verifying');
     setErrorMessage(null);
     
     try {
-      const regNumber = localStorage.getItem('student_id') || 'VU-BIT-2503-1728-DAY';
       const response = await fetch('/api/verify-face/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,19 +62,24 @@ export default function VerificationFlow({ examId }: VerifyFlowProps) {
       const data = await response.json();
       
       if (response.ok && data.verified) {
-        setStatus('success');
-        setTimeout(() => {
-          window.location.href = `/exam/${examId}`;
-        }, 1500);
+        await startExamAndRedirect();
       } else {
         setStatus('failed');
-        setErrorMessage(data.error || data.message || `Verification failed with status ${response.status}`);
+        setErrorMessage(data.error || data.message || `Verification failed.`);
       }
     } catch (error: any) {
       console.error('Verification error:', error);
       setStatus('failed');
       setErrorMessage(error.toString());
     }
+  };
+
+  const handleSkip = () => {
+    startExamAndRedirect("Bypassed via skip button");
+  };
+
+  const handleNoCamera = () => {
+    startExamAndRedirect("No working camera detected");
   };
 
   return (
@@ -51,16 +89,16 @@ export default function VerificationFlow({ examId }: VerifyFlowProps) {
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mb-2">
           Identity Verification
         </h1>
-        <p className="text-slate-500 max-w-lg mx-auto mb-8">
+        <p className="text-slate-500 max-w-lg mx-auto mb-6">
           Before entering exam <span className="font-semibold text-indigo-600">{examId}</span>, we need to verify your identity. The system will compare your face against your registered student ID.
         </p>
 
         {status === 'failed' && (
-          <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 flex items-start text-left text-red-800 max-w-2xl mx-auto">
+          <div className="mb-6 p-4 rounded-lg bg-red-50 border border-red-200 flex items-start text-left text-red-800 max-w-2xl mx-auto shadow-sm">
             <ShieldAlert className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
-            <div>
-              <h4 className="font-bold flex-1">Verification Failed</h4>
-              <p className="text-sm mt-1">{errorMessage ? `Error: ${errorMessage}. ` : ''}We couldn't match your face with the registered student ID. Please ensure good lighting and try again, or contact the invigilator.</p>
+            <div className="flex-1">
+              <h4 className="font-bold">Verification Failed</h4>
+              <p className="text-sm mt-1">{errorMessage ? `Error: ${errorMessage}. ` : ''}We couldn't match your face with the registered student ID. Please ensure good lighting and try again.</p>
             </div>
           </div>
         )}
@@ -69,12 +107,13 @@ export default function VerificationFlow({ examId }: VerifyFlowProps) {
           onCapture={handleCapture}
           isVerifying={status === 'verifying'}
           status={status}
+          onNoCameraBypass={handleNoCamera}
         />
-        
-        <div className="mt-12 flex justify-center">
-          <a href="/dashboard" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+
+        <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 max-w-2xl mx-auto">
+          <a href="/exams" className="inline-flex items-center text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
             <ArrowLeft className="w-4 h-4 mr-1.5" />
-            Cancel and Return to Dashboard
+            Cancel and Return
           </a>
         </div>
       </div>

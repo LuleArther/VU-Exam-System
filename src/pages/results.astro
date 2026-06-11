@@ -1,10 +1,10 @@
 ---
 import DashboardLayout from '../layouts/DashboardLayout.astro';
-import ExamsList from '../components/exam/ExamsList';
+import ResultsList from '../components/exam/ResultsList';
 ---
 
-<DashboardLayout title="Exams & Assessments">
+<DashboardLayout title="Exam Results">
   <div class="max-w-[1200px] mx-auto w-full pb-10">
-    <ExamsList client:only="react" />
+    <ResultsList client:only="react" />
   </div>
 </DashboardLayout>

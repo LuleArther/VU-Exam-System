@@ -112,10 +112,18 @@ You should now see the VClass System running perfectly on your Windows PC!
 
 ---
 
-## 🗄️ Step 6: Access the Backend Database (Admin Panel)
+## 🗄️ Step 6: Access the Database (Two Options)
 
-If you need to view or manage the data (like Students, Exams, and Results), you can use the built-in Django Admin Panel.
+If you need to view or manage the data (like Students, Exams, and Results), you have two ways to do it.
 
+### Option 1: View the Raw Database in VS Code (Recommended for quick checks)
+1. On the far left menu bar in VS Code, click the **Extensions** icon (it looks like 4 blocks).
+2. In the search bar, type **`SQLite DB Viewer`**. Look for the one by **keyshout** and click **Install**.
+3. Once installed, open your file explorer in VS Code.
+4. Go into the `backend` folder and click on the file named **`db.sqlite3`**.
+5. It will open a beautiful grid view right in VS Code showing you all your raw database tables!
+
+### Option 2: The Django Admin Panel (Recommended for editing data)
 1. Go back to your VS Code terminal (specifically the one running the backend where you activated `venv`).
 2. If the server is currently running, press **`Ctrl + C`** to stop it temporarily.
 3. Type the following command to create an admin account:

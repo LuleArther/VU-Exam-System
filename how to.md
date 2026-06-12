@@ -112,6 +112,30 @@ You should now see the VClass System running perfectly on your Windows PC!
 
 ---
 
+## 🗄️ Step 6: Access the Backend Database (Admin Panel)
+
+If you need to view or manage the data (like Students, Exams, and Results), you can use the built-in Django Admin Panel.
+
+1. Go back to your VS Code terminal (specifically the one running the backend where you activated `venv`).
+2. If the server is currently running, press **`Ctrl + C`** to stop it temporarily.
+3. Type the following command to create an admin account:
+   ```cmd
+   python manage.py createsuperuser
+   ```
+4. It will prompt you for:
+   - **Username**: (e.g., type `admin` and press Enter)
+   - **Email address**: (You can leave this blank and press Enter)
+   - **Password**: Type a password. *(Note: Nothing will show on the screen as you type for security reasons. Just type it and press Enter.)*
+   - **Password (again)**: Retype the password and press Enter.
+5. Start the server again:
+   ```cmd
+   python manage.py runserver
+   ```
+6. Open your browser and go to this exact URL (make sure you include the slash at the end!): **`http://localhost:8000/admin/`**
+7. Log in with the username and password you just created to access the database.
+
+---
+
 ### 🛑 How to Stop the System
 When you are done testing and want to shut the system down:
 1. Go back to VS Code.

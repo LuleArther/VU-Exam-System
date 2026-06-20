@@ -19,3 +19,12 @@ backend/**/__pycache__/
 .idea/
 node_modules
 public/media_*.png
+
+# Ignore virtual environments
+backend/my_venv/
+backend/venv_out.txt
+
+# Astro output directories
+dist/
+.vercel/
+.astro/

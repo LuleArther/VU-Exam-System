@@ -2,10 +2,22 @@ from django.db import models
 from django.contrib.auth.hashers import make_password, check_password
 import uuid
 
+FACULTY_CHOICES = [
+    ('ALL', 'All Students'),
+    ('FST', 'Faculty of Science & Technology'),
+    ('FBA', 'Faculty of Business Administration'),
+    ('FLAW', 'Faculty of Law'),
+    ('FED', 'Faculty of Education'),
+    ('FICT', 'Faculty of ICT'),
+    ('FHSS', 'Faculty of Humanities & Social Sciences'),
+    ('FMED', 'Faculty of Medicine'),
+]
+
 class Student(models.Model):
     registration_number = models.CharField(max_length=50, unique=True, primary_key=True)
     full_name = models.CharField(max_length=150)
     role = models.CharField(max_length=50, default="VClass Student")
+    faculty = models.CharField(max_length=10, choices=FACULTY_CHOICES, default='FST')
     # Store the path to the verified student ID photo used for DeepFace reference
     reference_image_path = models.CharField(max_length=255)
     
@@ -37,6 +49,11 @@ class Exam(models.Model):
     exam_type = models.CharField(max_length=20, default='objective')
     questions_json = models.TextField(default='[]')
     is_active = models.BooleanField(default=True)
+    
+    # Assignment: 'ALL', a faculty code like 'FST', or 'SPECIFIC'
+    assigned_to = models.CharField(max_length=20, default='ALL')
+    # Comma-separated reg numbers if assigned_to == 'SPECIFIC'
+    specific_students = models.TextField(default='', blank=True)
 
     def __str__(self):
         return self.title

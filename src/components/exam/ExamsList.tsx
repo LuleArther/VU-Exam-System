@@ -9,7 +9,7 @@ interface Exam {
   duration: string;
   type: string;
   question_count: number;
-  status: 'upcoming' | 'active' | 'completed';
+  status: 'upcoming' | 'active' | 'completed' | 'graded';
 }
 
 export default function ExamsList() {
@@ -44,7 +44,8 @@ export default function ExamsList() {
     exam.courseCode.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const activeExams = filteredExams.filter(e => e.status !== 'completed' && e.status !== 'graded');
+  const activeExams    = filteredExams.filter(e => e.status !== 'completed' && e.status !== 'graded');
+  const submittedExams = filteredExams.filter(e => e.status === 'completed' || e.status === 'graded');
 
   if (loading) {
     return (
@@ -59,7 +60,7 @@ export default function ExamsList() {
     <div className="w-full">
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
         <div>
-          <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight">Exams & Assessments</h1>
+          <h1 className="text-2xl sm:text-[28px] font-bold text-slate-900 tracking-tight">Exams &amp; Assessments</h1>
           <p className="text-slate-500 mt-1 font-medium">View and manage your upcoming university exams.</p>
         </div>
         
@@ -97,9 +98,9 @@ export default function ExamsList() {
         <div className="space-y-10">
           {/* Active & Live Exams */}
           <section>
-            <h2 className="text-[17px] font-bold text-[#2c6fb7] mb-5 pb-3 border-b border-slate-200">Live & Upcoming</h2>
+            <h2 className="text-[17px] font-bold text-[#2c6fb7] mb-5 pb-3 border-b border-slate-200">Live &amp; Upcoming</h2>
             {activeExams.length === 0 ? (
-              <p className="text-slate-400 text-sm italic font-medium py-4">No live or upcoming exams matches your search.</p>
+              <p className="text-slate-400 text-sm italic font-medium py-4">No live or upcoming exams match your search.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {activeExams.map(exam => (
@@ -143,6 +144,60 @@ export default function ExamsList() {
               </div>
             )}
           </section>
+
+          {/* Submitted / Awaiting Grade */}
+          {submittedExams.length > 0 && (
+            <section>
+              <h2 className="text-[17px] font-bold text-slate-600 mb-5 pb-3 border-b border-slate-200">Submitted Papers</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {submittedExams.map(exam => (
+                  <div key={exam.id} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm opacity-90">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-600">
+                            {exam.courseCode}
+                          </span>
+                          {exam.status === 'graded' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">
+                              ✓ Graded
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-700">
+                              ⏳ Awaiting Grade
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="text-lg font-bold text-slate-700 leading-tight mt-1">{exam.title}</h3>
+                      </div>
+                      <div className="p-2 bg-slate-50 rounded-lg text-slate-400">
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 mb-6">
+                      <div className="flex items-center text-sm text-slate-500">
+                        <Calendar className="w-4 h-4 mr-2 text-slate-400" />
+                        <span>Submitted: {exam.date}</span>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100">
+                      {exam.status === 'graded' ? (
+                        <a href="/results" className="w-full inline-flex justify-center items-center py-2 px-4 border border-emerald-300 rounded-lg text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors">
+                          View Results <ChevronRight className="w-4 h-4 ml-1" />
+                        </a>
+                      ) : (
+                        <div className="w-full inline-flex justify-center items-center py-2 px-4 rounded-lg text-sm font-semibold text-slate-400 bg-slate-50 border border-slate-200 cursor-not-allowed select-none">
+                          Paper submitted – Grade not yet released
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>

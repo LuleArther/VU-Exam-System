@@ -49,7 +49,7 @@ export default function ExamInterface({ examId }: { examId: string }) {
 
   const regNumber = localStorage.getItem('student_id') || 'VU-BIT-STUDENT';
 
-  // 1. Fetch Exam Details
+  // 1. Fetch Exam Details — and guard against re-entry if already submitted
   useEffect(() => {
     const fetchExam = async () => {
       try {
@@ -68,6 +68,21 @@ export default function ExamInterface({ examId }: { examId: string }) {
             { id: 'q2', type: 'multiple_choice', text: 'In relational algebra, which operator is used to combine tuples from two relations?', options: ['Projection', 'Selection', 'Join', 'Union'], points: 2 },
             { id: 'q3', type: 'essay', text: 'Explain the difference between First Normal Form (1NF) and Second Normal Form (2NF) with an example. Outline how update anomalies are prevented.', points: 10 }
           ]);
+        }
+
+        // Guard: if student already submitted this exam, send them to results immediately
+        const sid = localStorage.getItem('student_id');
+        if (sid) {
+          const statusRes = await fetch(`/api/exams/?student_id=${sid}`);
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            const thisExam = (statusData.exams || []).find((e: any) => e.id === examId);
+            if (thisExam && (thisExam.status === 'completed' || thisExam.status === 'graded')) {
+              // Already submitted — go straight to results
+              window.location.href = '/results';
+              return;
+            }
+          }
         }
       } catch (err) {
         console.error("Failed to load exam:", err);
@@ -164,10 +179,17 @@ export default function ExamInterface({ examId }: { examId: string }) {
       });
       if (response.ok) {
         setSubmitted(true);
+        // Redirect to results page after 2.5 seconds
+        setTimeout(() => {
+          window.location.href = '/results';
+        }, 2500);
       }
     } catch (err) {
       console.error("Error submitting exam:", err);
-      setSubmitted(true); // fall through
+      setSubmitted(true);
+      setTimeout(() => {
+        window.location.href = '/results';
+      }, 2500);
     } finally {
       setLoading(false);
     }
@@ -185,17 +207,22 @@ export default function ExamInterface({ examId }: { examId: string }) {
   if (submitted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center max-w-2xl mx-auto px-4">
-        <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 shadow-sm">
+        <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6 shadow-sm animate-bounce">
           <CheckCircle2 className="w-10 h-10" strokeWidth={2.5}/>
         </div>
-        <h2 className="text-3xl font-bold text-[#1a365d] mb-4 tracking-tight">Exam Submitted Successfully</h2>
-        <p className="text-slate-600 text-lg mb-10 leading-relaxed font-medium">
-          Your secure exam record for <strong>{examTitle}</strong> has been saved and uploaded. 
-          {examType === 'objective' ? ' You can review your scores from your student grades.' : ' Your lecturer will review and grade your essay responses shortly.'}
+        <h2 className="text-3xl font-bold text-[#1a365d] mb-3 tracking-tight">Paper Submitted!</h2>
+        <p className="text-slate-600 text-lg mb-4 leading-relaxed font-medium">
+          Your answers for <strong>{examTitle}</strong> have been recorded.
         </p>
-        <a href="/dashboard" className="px-8 py-3.5 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white font-bold rounded-lg shadow-md transition-all">
-          Return to Dashboard
-        </a>
+        <p className="text-slate-500 text-sm mb-8">
+          {examType === 'objective'
+            ? 'Your paper has been auto-graded. You can view your score in the Results page.'
+            : 'Your essay has been submitted and is awaiting lecturer review. Grade will be released soon.'}
+        </p>
+        <div className="flex items-center gap-2 text-slate-400 text-sm">
+          <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+          Redirecting you to your results...
+        </div>
       </div>
     );
   }

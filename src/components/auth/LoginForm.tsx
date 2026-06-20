@@ -8,11 +8,9 @@ export default function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Verification code flow state
   const [showVerification, setShowVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [targetEmail, setTargetEmail] = useState('');
-  const [demoCode, setDemoCode] = useState('');
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +33,6 @@ export default function LoginForm() {
       // If student login requires email verification
       if (data.verification_required) {
         setTargetEmail(data.email);
-        setDemoCode(data.debug_code || '');
         setShowVerification(true);
         setLoading(false);
         return;
@@ -83,8 +80,9 @@ export default function LoginForm() {
       // Save credentials and redirect
       localStorage.setItem('auth_token', data.token);
       localStorage.setItem('student_name', data.student_name);
-      localStorage.setItem('student_id', regNo);
+      localStorage.setItem('student_id', data.student_id || regNo);
       localStorage.setItem('role', 'student');
+      if (data.faculty) localStorage.setItem('student_faculty', data.faculty);
 
       window.location.href = '/dashboard';
     } catch (err: any) {
@@ -106,21 +104,6 @@ export default function LoginForm() {
           </p>
         </div>
 
-        {/* Developer Demo Toast */}
-        {demoCode && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-lg text-[13px] flex items-center justify-between shadow-sm animate-pulse">
-            <div>
-              <strong>Demo Tip:</strong> Verification code is <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded font-bold">{demoCode}</span>
-            </div>
-            <button 
-              type="button" 
-              onClick={() => setVerificationCode(demoCode)}
-              className="text-[#2c6fb7] hover:underline font-bold text-xs"
-            >
-              Autofill
-            </button>
-          </div>
-        )}
 
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-200 flex gap-2">

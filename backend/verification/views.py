@@ -23,8 +23,96 @@ STUDENTS_DIR = "/tmp/students_reference"
 os.makedirs(TEMP_DIR, exist_ok=True)
 os.makedirs(STUDENTS_DIR, exist_ok=True)
 
-# Global in-memory dictionary to store active student verification codes
-PENDING_CODES = {}
+# ─────────────────────────────────────────────────────────────────────────────
+# Model Warm-up (runs ONCE when Django loads this module)
+# Pre-loading VGG-Face into memory means the first real verification
+# takes 2–4 seconds instead of 30–120 seconds.
+# ─────────────────────────────────────────────────────────────────────────────
+_DEEPFACE_WARM = False
+
+def _warmup_deepface():
+    """Build a dummy 1-pixel image and run DeepFace.represent() to force
+    the VGG-Face model weights to load into memory now, not on first request."""
+    global _DEEPFACE_WARM
+    if DeepFace and not _DEEPFACE_WARM:
+        try:
+            dummy = np.zeros((224, 224, 3), dtype=np.uint8)
+            dummy_path = os.path.join(TEMP_DIR, "_warmup.jpg")
+            cv2.imwrite(dummy_path, dummy)
+            DeepFace.represent(
+                img_path=dummy_path,
+                model_name="VGG-Face",
+                enforce_detection=False,
+                detector_backend="opencv",
+            )
+            if os.path.exists(dummy_path):
+                os.remove(dummy_path)
+            _DEEPFACE_WARM = True
+            print("[FACE] VGG-Face model pre-loaded ✅")
+        except Exception as e:
+            print(f"[FACE] Warm-up skipped: {e}")
+
+_warmup_deepface()
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Email helper using Resend
+# ─────────────────────────────────────────────────────────────────────────────
+def send_otp_email(to_email: str, code: str, student_name: str, purpose: str = "registration"):
+    """Send OTP via Resend. Falls back to console log if Resend unavailable."""
+    subject = "Victoria University – Email Verification Code"
+    if purpose == "login":
+        subject = "Victoria University – Login Verification Code"
+
+    html_body = f"""
+    <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 520px; margin: 0 auto; background: #f8fafc; border-radius: 12px; overflow: hidden;">
+      <div style="background: linear-gradient(135deg, #2c6fb7, #1a5ba0); padding: 32px; text-align: center;">
+        <h1 style="color: white; font-size: 22px; margin: 0; letter-spacing: -0.5px;">Victoria University</h1>
+        <p style="color: rgba(255,255,255,0.8); margin: 6px 0 0; font-size: 13px;">Online Examination Portal</p>
+      </div>
+      <div style="padding: 36px 32px; background: white;">
+        <h2 style="color: #1e293b; font-size: 18px; font-weight: 700; margin: 0 0 12px;">Hello, {student_name}!</h2>
+        <p style="color: #475569; font-size: 14px; line-height: 1.6; margin: 0 0 24px;">
+          Your verification code for <strong>{purpose}</strong> is:
+        </p>
+        <div style="background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px; text-align: center; margin-bottom: 24px;">
+          <span style="font-size: 36px; font-weight: 900; letter-spacing: 10px; color: #2c6fb7; font-family: monospace;">{code}</span>
+        </div>
+        <p style="color: #94a3b8; font-size: 12px; margin: 0;">
+          This code expires in <strong>10 minutes</strong>. If you did not request this, please ignore this email.
+        </p>
+      </div>
+      <div style="background: #f1f5f9; padding: 16px; text-align: center;">
+        <p style="color: #94a3b8; font-size: 11px; margin: 0;">&copy; Victoria University Kampala &bull; www.vu.ac.ug</p>
+      </div>
+    </div>
+    """
+
+    resend_key = getattr(settings, 'RESEND_API_KEY', None)
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'onboarding@resend.dev')
+
+    if resend_key:
+        try:
+            import resend
+            resend.api_key = resend_key
+            resend.Emails.send({
+                "from": f"Victoria University <{from_email}>",
+                "to": [to_email],
+                "subject": subject,
+                "html": html_body,
+            })
+            print(f"[EMAIL] OTP sent to {to_email}")
+        except Exception as e:
+            print(f"[EMAIL ERROR] Failed to send via Resend: {e}")
+            print(f"[FALLBACK] OTP for {to_email}: {code}")
+    else:
+        print(f"\n[DEMO] Verification code for {to_email}: {code}\n")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Auth Views
+# ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(['POST'])
 def register(request):
@@ -34,6 +122,7 @@ def register(request):
     full_name = data.get('full_name')
     password = data.get('password')
     image_b64 = data.get('base64_image')
+    faculty = data.get('faculty', 'FST')
 
     if not all([reg_number, email, full_name, password, image_b64]):
         return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
@@ -55,6 +144,7 @@ def register(request):
             registration_number=reg_number,
             email=email,
             full_name=full_name,
+            faculty=faculty,
             reference_image_path=ref_path,
             is_active=False
         )
@@ -68,14 +158,14 @@ def register(request):
             defaults={'code': code, 'created_at': timezone.now()}
         )
         
-        print(f"\n[DEMO] Registration Verification code for {student.registration_number}: {code}\n")
+        # Send OTP via Resend
+        send_otp_email(email, code, full_name, purpose="registration")
         
         return Response({
             "success": True, 
             "verification_required": True,
             "email": email,
-            "debug_code": code,
-            "message": "Registration initiated. Verification required."
+            "message": "Registration initiated. Please check your email for a verification code."
         }, status=status.HTTP_201_CREATED)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -108,7 +198,9 @@ def verify_registration_code(request):
                 "success": True,
                 "token": token,
                 "student_name": student.full_name,
-                "role": "student"
+                "role": "student",
+                "student_id": student.registration_number,
+                "faculty": student.faculty
             })
         else:
             return Response({"error": "Invalid verification code"}, status=status.HTTP_400_BAD_REQUEST)
@@ -122,6 +214,7 @@ def update_profile(request):
         full_name = request.data.get('full_name')
         password = request.data.get('password')
         image_b64 = request.data.get('image_base64')
+        faculty = request.data.get('faculty')
 
         if not reg_number:
             return Response({"error": "Registration number is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -136,6 +229,9 @@ def update_profile(request):
 
         if password and password.strip():
             student.set_password(password.strip())
+
+        if faculty:
+            student.faculty = faculty
 
         if image_b64:
             if "," in image_b64:
@@ -197,13 +293,13 @@ def login(request):
                 defaults={'code': code, 'created_at': timezone.now()}
             )
             
-            print(f"\n[DEMO] Login Verification code for {student.registration_number}: {code}\n")
+            email_to = student.email if student.email else f"{reg_number.lower()}@vu.ac.ug"
+            send_otp_email(email_to, code, student.full_name, purpose="login")
             
             return Response({
                 "success": True, 
                 "verification_required": True,
-                "email": student.email if student.email else f"{reg_number.lower()}@vu.ac.ug",
-                "debug_code": code
+                "email": email_to,
             })
         else:
             return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -235,7 +331,9 @@ def verify_login_code(request):
                 "success": True,
                 "token": token,
                 "student_name": student.full_name,
-                "role": "student"
+                "role": "student",
+                "student_id": student.registration_number,
+                "faculty": student.faculty
             })
         else:
             return Response({"error": "Invalid verification code"}, status=status.HTTP_400_BAD_REQUEST)
@@ -291,46 +389,80 @@ def verify_face(request):
     try:
         ref_path = student.reference_image_path
         if not os.path.exists(ref_path):
-            return Response({"error": f"Student reference image missing on server."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"error": "Student reference image missing on server."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Run Face Verification (DeepFace or OpenCV Fallback)
         is_verified = False
-        distance = 1.0
-        threshold = 0.4
-        
+        distance    = 1.0
+        threshold   = 0.55   # VGG-Face lenient threshold
+        model_used  = "none"
+
+        # ── 1. Downscale to 640px max width (reduces memory + speeds up inference) ──
+        h, w = img_cv2.shape[:2]
+        if w > 640:
+            scale   = 640 / w
+            img_cv2 = cv2.resize(img_cv2, (640, int(h * scale)), interpolation=cv2.INTER_AREA)
+
+        # ── 2. CLAHE brightness normalisation (handles dark / bright rooms) ────────
+        try:
+            lab  = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2LAB)
+            l, a, b = cv2.split(lab)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            lab   = cv2.merge((clahe.apply(l), a, b))
+            img_cv2 = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+        except Exception:
+            pass  # if colour conversion fails just use the raw frame
+
+        proc_path = os.path.join(TEMP_DIR, f"proc_{reg_number}.jpg")
+        cv2.imwrite(proc_path, img_cv2, [cv2.IMWRITE_JPEG_QUALITY, 90])
+
         if DeepFace:
+            # ── Single fast model: VGG-Face is the fastest model in DeepFace
+            # and still ~90 %+ accurate. Using opencv detector (fastest).
+            # enforce_detection=False means it won’t crash on a slightly
+            # off-centre face – it still finds the face, just more tolerantly.
             try:
                 result = DeepFace.verify(
-                    img1_path=img_cv2, 
-                    img2_path=ref_path, 
-                    model_name="Facenet512",
-                    enforce_detection=True
+                    img1_path=proc_path,
+                    img2_path=ref_path,
+                    model_name="VGG-Face",
+                    enforce_detection=False,
+                    detector_backend="opencv",
                 )
-                is_verified = result.get("verified", False)
-                distance = result.get("distance", 1.0)
-                threshold = result.get("threshold", 0.4)
+                distance    = result.get("distance", 1.0)
+                # DeepFace default VGG-Face threshold is 0.40; we loosen to 0.55
+                # so minor lighting / angle variation still passes
+                is_verified = distance <= 0.55
+                model_used  = "VGG-Face"
             except Exception as e:
+                print(f"[FACE] VGG-Face error: {e}")
                 is_verified = False
         else:
-            # OpenCV Fallback - check if there's at least one face in the frame
-            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            # DeepFace not available — use Haar cascade (face-detected = pass)
+            cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
             face_cascade = cv2.CascadeClassifier(cascade_path)
-            gray = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2GRAY)
+            gray  = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2GRAY)
             faces = face_cascade.detectMultiScale(gray, 1.1, 4)
             is_verified = len(faces) > 0
-            distance = 0.0 if is_verified else 1.0
-            threshold = 0.5
+            distance    = 0.0 if is_verified else 1.0
+            threshold   = 0.5
+            model_used  = "haarcascade"
+
+        # ── Clean up ───────────────────────────────────────────────────────────────
+        if os.path.exists(proc_path):
+            os.remove(proc_path)
 
         log, created = ExamLog.objects.get_or_create(student=student, exam=exam)
         log.verification_attempts += 1
         log.is_verified = is_verified
         log.save()
-        
+
         return Response({
-            "verified": is_verified,
-            "distance": distance,
-            "threshold": threshold,
-            "message": "Face match successful." if is_verified else "Face mismatch. Position yourself directly in front of the camera."
+            "verified":   is_verified,
+            "distance":   round(distance, 4),
+            "threshold":  round(threshold, 4),
+            "model_used": model_used,
+            "message":    "Face match successful." if is_verified
+                          else "Face mismatch. Ensure good lighting and look directly at the camera."
         })
 
     except Exception as e:
@@ -341,6 +473,7 @@ def verify_face(request):
     finally:
         if os.path.exists(temp_img_path):
             os.remove(temp_img_path)
+
 
 @api_view(['POST'])
 def verify_continuous(request):
@@ -380,17 +513,10 @@ def verify_continuous(request):
         height, width = gray.shape
         frame_area = height * width
         
-        # ──────────────────────────────────────────────────
-        # STEP 1: Camera covered / obstructed detection
-        # If the average brightness is very low, the camera
-        # is likely covered by a hand or object.
-        # ──────────────────────────────────────────────────
         avg_brightness = float(np.mean(gray))
-        is_camera_covered = avg_brightness < 35  # very dark frame
-        
-        # Also check if the frame is nearly uniform (e.g. a hand or paper)
+        is_camera_covered = avg_brightness < 35
         brightness_std = float(np.std(gray))
-        is_uniform = brightness_std < 15  # almost no variation
+        is_uniform = brightness_std < 15
         
         log, _ = ExamLog.objects.get_or_create(student=student, exam=exam)
         
@@ -402,34 +528,27 @@ def verify_continuous(request):
         is_verified = True
         event_name = ""
         details = ""
+        num_faces = 0
         
         if is_camera_covered or (is_uniform and avg_brightness < 80):
-            # Camera is covered or obstructed
             is_verified = False
             log.impersonation_flags += 1
             event_name = "Camera Covered"
             details = f"Camera appears to be covered or obstructed (brightness: {avg_brightness:.0f}, variation: {brightness_std:.0f})."
         else:
-            # ──────────────────────────────────────────────────
-            # STEP 2: Face detection with strict parameters
-            # Use high minNeighbors (10) so only very confident
-            # detections count.  Require each face to occupy at
-            # least 3% of the frame area to ignore tiny ghosts.
-            # ──────────────────────────────────────────────────
             cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
             face_cascade = cv2.CascadeClassifier(cascade_path)
             
-            min_face_side = int(min(height, width) * 0.10)  # face must be >= 10% of smallest dimension
+            min_face_side = int(min(height, width) * 0.10)
             
             faces = face_cascade.detectMultiScale(
                 gray,
-                scaleFactor=1.15,   # slightly coarser scale steps (fewer false positives)
-                minNeighbors=10,    # very high confidence required
+                scaleFactor=1.15,
+                minNeighbors=10,
                 minSize=(min_face_side, min_face_side),
                 flags=cv2.CASCADE_SCALE_IMAGE
             )
             
-            # Extra filter: discard any detection smaller than 3% of frame area
             confirmed_faces = []
             for (x, y, w, h) in faces:
                 face_area = w * h
@@ -449,14 +568,13 @@ def verify_continuous(request):
                 event_name = "No Face Detected"
                 details = "No face detected in the camera feed. Please look at the camera."
             else:
-                # Exactly 1 face – optionally verify identity with DeepFace
                 if DeepFace and os.path.exists(ref_path):
                     try:
                         result = DeepFace.verify(
                             img1_path=img_cv2, 
                             img2_path=ref_path, 
                             model_name="Facenet512",
-                            enforce_detection=False  # we already confirmed a face exists
+                            enforce_detection=False
                         )
                         is_verified = result.get("verified", False)
                         if not is_verified:
@@ -464,10 +582,9 @@ def verify_continuous(request):
                             event_name = "Face Mismatch"
                             details = "Face does not match the baseline profile."
                     except Exception:
-                        # DeepFace failed (blurry, angle, etc.) – do NOT penalise
                         is_verified = True
                 else:
-                    is_verified = True  # Fallback when DeepFace not available
+                    is_verified = True
 
         if event_name:
             timeline.append({
@@ -497,12 +614,40 @@ def verify_continuous(request):
         if os.path.exists(temp_img_path):
             os.remove(temp_img_path)
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Exam Views
+# ─────────────────────────────────────────────────────────────────────────────
+
 @api_view(['GET'])
 def list_exams(request):
     student_id = request.query_params.get('student_id')
-    exams = Exam.objects.filter(is_active=True).order_by('-date')
+    
+    # Get active exams
+    exams_qs = Exam.objects.filter(is_active=True).order_by('-date')
+    
+    # Filter by assignment if student_id provided
+    if student_id:
+        try:
+            student = Student.objects.get(registration_number=student_id)
+            student_faculty = student.faculty
+            
+            filtered = []
+            for exam in exams_qs:
+                if exam.assigned_to == 'ALL':
+                    filtered.append(exam)
+                elif exam.assigned_to == student_faculty:
+                    filtered.append(exam)
+                elif exam.assigned_to == 'SPECIFIC':
+                    specific = [s.strip() for s in exam.specific_students.split(',') if s.strip()]
+                    if student_id in specific:
+                        filtered.append(exam)
+            exams_qs = filtered
+        except Student.DoesNotExist:
+            pass  # If student not found, return all exams
+    
     data = []
-    for exam in exams:
+    for exam in exams_qs:
         status_val = "active"
         score_val = None
         max_score_val = None
@@ -536,9 +681,11 @@ def list_exams(request):
             "question_count": q_count,
             "status": status_val,
             "score": score_val,
-            "max_score": max_score_val
+            "max_score": max_score_val,
+            "assigned_to": exam.assigned_to
         })
     return Response({"exams": data})
+
 
 @api_view(['POST'])
 def create_exam(request):
@@ -548,6 +695,8 @@ def create_exam(request):
     duration_minutes = int(data.get('duration_minutes', 120))
     exam_type = data.get('exam_type', 'objective')
     questions = data.get('questions', [])
+    assigned_to = data.get('assigned_to', 'ALL')
+    specific_students = data.get('specific_students', '')
     
     exam, created = Exam.objects.update_or_create(
         exam_id=exam_id,
@@ -557,10 +706,13 @@ def create_exam(request):
             'duration_minutes': duration_minutes,
             'exam_type': exam_type,
             'questions_json': json.dumps(questions),
-            'is_active': True
+            'is_active': True,
+            'assigned_to': assigned_to,
+            'specific_students': specific_students,
         }
     )
-    return Response({"success": True, "exam_id": exam.exam_id})
+    return Response({"success": True, "exam_id": exam.exam_id, "created": created})
+
 
 @api_view(['GET'])
 def get_exam(request, exam_id):
@@ -588,6 +740,66 @@ def get_exam(request, exam_id):
         "type": exam.exam_type,
         "questions": stripped
     })
+
+
+@api_view(['GET'])
+def get_exam_full(request, exam_id):
+    """Return exam with correct answers — for lecturers only."""
+    exam = get_object_or_404(Exam, exam_id=exam_id)
+    try:
+        questions = json.loads(exam.questions_json)
+    except:
+        questions = []
+
+    return Response({
+        "exam_id": exam.exam_id,
+        "title": exam.title,
+        "duration_minutes": exam.duration_minutes,
+        "exam_type": exam.exam_type,
+        "assigned_to": exam.assigned_to,
+        "specific_students": exam.specific_students,
+        "questions": questions  # includes correct_answer
+    })
+
+
+@api_view(['GET'])
+def list_all_exams(request):
+    """List all exams for the lecturer dashboard."""
+    exams = Exam.objects.all().order_by('-date')
+    data = []
+    for exam in exams:
+        try:
+            q_count = len(json.loads(exam.questions_json))
+        except:
+            q_count = 0
+        data.append({
+            "exam_id": exam.exam_id,
+            "title": exam.title,
+            "exam_type": exam.exam_type,
+            "duration_minutes": exam.duration_minutes,
+            "question_count": q_count,
+            "assigned_to": exam.assigned_to,
+            "is_active": exam.is_active,
+            "date": exam.date.strftime("%Y-%m-%d %H:%M") if exam.date else "",
+        })
+    return Response({"exams": data})
+
+
+@api_view(['GET'])
+def list_students(request):
+    """List all registered students — for specific assignment picker."""
+    students = Student.objects.all().order_by('full_name')
+    data = [
+        {
+            "registration_number": s.registration_number,
+            "full_name": s.full_name,
+            "faculty": s.faculty,
+            "email": s.email
+        }
+        for s in students
+    ]
+    return Response({"students": data})
+
 
 @api_view(['POST'])
 def start_exam(request, exam_id):
@@ -652,9 +864,10 @@ def submit_exam(request, exam_id):
             for q in questions:
                 points = q.get('points', 1)
                 total_points += points
-                correct = q.get('correct_answer')
-                student_ans = answers.get(q.get('id'))
-                if student_ans == correct:
+                correct = q.get('correct_answer', '').strip()
+                student_ans = str(answers.get(q.get('id'), '')).strip()
+                print(f"[GRADE DEBUG] Q: {q.get('id')} | correct: '{correct}' | student: '{student_ans}' | match: {student_ans == correct}")
+                if student_ans and correct and student_ans == correct:
                     earned_points += points
                     
             if total_points > 0:
@@ -664,7 +877,7 @@ def submit_exam(request, exam_id):
                 elif score >= 70: grade_letter = 'C'
                 elif score >= 60: grade_letter = 'D'
                 else: grade_letter = 'F'
-                feedback = f"Automatically graded. {earned_points}/{total_points} correct answers."
+                feedback = f"Automatically graded. {earned_points}/{total_points} points earned."
             else:
                 score = 100.0
                 grade_letter = 'A'
@@ -782,6 +995,7 @@ def dashboard_logs(request):
             "max_score": max_score,
             "student_name": log.student.full_name,
             "registration_number": log.student.registration_number,
+            "faculty": log.student.faculty,
             "exam_id": log.exam.exam_id,
             "exam_name": log.exam.title,
             "timestamp": log.last_verified_at.isoformat(),

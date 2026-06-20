@@ -8,12 +8,23 @@ const videoConstraints = {
   facingMode: "user"
 };
 
+const FACULTIES = [
+  { code: 'FST', label: 'FST – Faculty of Science & Technology' },
+  { code: 'FBA', label: 'FBA – Faculty of Business Administration' },
+  { code: 'FLAW', label: 'FLAW – Faculty of Law' },
+  { code: 'FED', label: 'FED – Faculty of Education' },
+  { code: 'FICT', label: 'FICT – Faculty of ICT' },
+  { code: 'FHSS', label: 'FHSS – Humanities & Social Sciences' },
+  { code: 'FMED', label: 'FMED – Faculty of Medicine' },
+];
+
 export default function RegistrationForm() {
   const [step, setStep] = useState(1);
   const [regNo, setRegNo] = useState('');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
+  const [faculty, setFaculty] = useState('FST');
   
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const webcamRef = useRef<Webcam>(null);
@@ -21,10 +32,8 @@ export default function RegistrationForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  // Verification code flow state
   const [verificationCode, setVerificationCode] = useState('');
   const [targetEmail, setTargetEmail] = useState('');
-  const [demoCode, setDemoCode] = useState('');
 
   const capture = useCallback(() => {
     const image = webcamRef.current?.getScreenshot();
@@ -62,7 +71,8 @@ export default function RegistrationForm() {
           email: email,
           full_name: fullName,
           password: password,
-          base64_image: imageSrc
+          base64_image: imageSrc,
+          faculty: faculty
         })
       });
 
@@ -74,7 +84,6 @@ export default function RegistrationForm() {
 
       if (data.verification_required) {
         setTargetEmail(data.email);
-        setDemoCode(data.debug_code || '');
         setStep(3);
         setLoading(false);
         return;
@@ -185,6 +194,19 @@ export default function RegistrationForm() {
               className="w-full px-4 py-3 bg-white border border-slate-200 rounded text-[14px] text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
             />
           </div>
+          <div>
+            <label className="block text-[13px] text-slate-600 font-semibold mb-1">Faculty / Programme</label>
+            <select
+              required
+              value={faculty}
+              onChange={(e) => setFaculty(e.target.value)}
+              className="w-full px-4 py-3 bg-white border border-slate-200 rounded text-[14px] text-slate-800 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+            >
+              {FACULTIES.map(f => (
+                <option key={f.code} value={f.code}>{f.label}</option>
+              ))}
+            </select>
+          </div>
           <div className="pt-4">
             <button 
               type="submit" 
@@ -215,10 +237,10 @@ export default function RegistrationForm() {
                 screenshotFormat="image/jpeg"
                 videoConstraints={videoConstraints}
                 className="w-full h-full object-cover"
-                mirrored={true}
+                mirrored={false}
               />
             ) : (
-              <img src={imageSrc} alt="Baseline capture" className="w-full h-full object-cover mirrored" style={{ transform: 'scaleX(-1)' }} />
+              <img src={imageSrc} alt="Baseline capture" className="w-full h-full object-cover" />
             )}
             
             {/* Guide overlay */}
@@ -273,21 +295,7 @@ export default function RegistrationForm() {
             </p>
           </div>
 
-          {/* Developer Demo Toast */}
-          {demoCode && (
-            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2.5 rounded-lg text-[13px] flex items-center justify-between shadow-sm animate-pulse">
-              <div>
-                <strong>Demo Tip:</strong> Verification code is <span className="font-mono bg-amber-100 px-1.5 py-0.5 rounded font-bold">{demoCode}</span>
-              </div>
-              <button 
-                type="button" 
-                onClick={() => setVerificationCode(demoCode)}
-                className="text-[#2c6fb7] hover:underline font-bold text-xs"
-              >
-                Autofill
-              </button>
-            </div>
-          )}
+
 
           <div>
             <input 

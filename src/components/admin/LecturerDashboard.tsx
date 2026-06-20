@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   ShieldAlert, CheckCircle, Clock, Users, ShieldCheck, Search, 
   Activity, RefreshCw, PlusCircle, Trash2, ListOrdered, CheckSquare, 
-  BookOpen, ChevronRight, X, Award, FileSpreadsheet, Eye, LogOut 
+  BookOpen, X, Award, FileSpreadsheet, Eye, LogOut, ClipboardCheck,
+  ChevronLeft, ChevronRight, Pencil, Radio, AlignLeft, AlertCircle,
+  Layers, UserCheck, Edit3, List, ZoomIn
 } from 'lucide-react';
 
 interface Question {
@@ -24,6 +26,7 @@ interface ExamLog {
   id: number;
   student_name: string;
   registration_number: string;
+  faculty?: string;
   exam_id: string;
   exam_name: string;
   timestamp: string;
@@ -43,20 +46,47 @@ interface ExamLog {
   submitted_at?: string;
 }
 
+interface ExamItem {
+  exam_id: string;
+  title: string;
+  exam_type: string;
+  duration_minutes: number;
+  question_count: number;
+  assigned_to: string;
+  is_active: boolean;
+}
+
+interface StudentItem {
+  registration_number: string;
+  full_name: string;
+  faculty: string;
+}
+
+const FACULTIES = [
+  { code: 'ALL', label: 'All Students' },
+  { code: 'FST', label: 'FST – Science & Technology' },
+  { code: 'FBA', label: 'FBA – Business Administration' },
+  { code: 'FLAW', label: 'FLAW – Faculty of Law' },
+  { code: 'FED', label: 'FED – Education' },
+  { code: 'FICT', label: 'FICT – Information & Communication Technology' },
+  { code: 'FHSS', label: 'FHSS – Humanities & Social Sciences' },
+  { code: 'FMED', label: 'FMED – Faculty of Medicine' },
+];
+
 export default function LecturerDashboard() {
   const [logs, setLogs] = useState<ExamLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'monitoring' | 'create_exam'>('monitoring');
+  const [activeTab, setActiveTab] = useState<'monitoring' | 'create_exam' | 'manage_exams'>('monitoring');
 
   // Real-time cheat alert states
   const [activeAlerts, setActiveAlerts] = useState<{ id: string; message: string; timestamp: Date }[]>([]);
 
-  // Selected student for detailed timeline/answers view
+  // Selected student for grading
   const [selectedLog, setSelectedLog] = useState<ExamLog | null>(null);
-
-  // Grading states
-  const [gradeScore, setGradeScore] = useState<number>(0);
+  const [gradingView, setGradingView] = useState(false);
+  const [gradingQIndex, setGradingQIndex] = useState(0);
+  const [questionScores, setQuestionScores] = useState<Record<string, number>>({});
   const [gradeLetter, setGradeLetter] = useState<string>('A');
   const [gradeFeedback, setGradeFeedback] = useState<string>('');
   const [gradeSubmitting, setGradeSubmitting] = useState(false);
@@ -67,14 +97,25 @@ export default function LecturerDashboard() {
   const [examDuration, setExamDuration] = useState('120');
   const [examType, setExamType] = useState<'objective' | 'essay'>('objective');
   const [questionsList, setQuestionsList] = useState<Question[]>([]);
+  const [assignedTo, setAssignedTo] = useState('ALL');
+  const [specificStudents, setSpecificStudents] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewQIndex, setPreviewQIndex] = useState(0);
+
+  // Edit exam states
+  const [editMode, setEditMode] = useState(false);
+  const [allExams, setAllExams] = useState<ExamItem[]>([]);
+  const [allStudents, setAllStudents] = useState<StudentItem[]>([]);
+  const [loadingExams, setLoadingExams] = useState(false);
 
   // Temporary question creator states
   const [qText, setQText] = useState('');
   const [qPoints, setQPoints] = useState('1');
   const [qOptions, setQOptions] = useState<string[]>(['', '', '', '']);
   const [qCorrect, setQCorrect] = useState('');
+  const [qCorrectIndex, setQCorrectIndex] = useState<number>(-1);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       const res = await fetch('/api/dashboard-logs/');
       if (res.ok) {
@@ -82,18 +123,21 @@ export default function LecturerDashboard() {
         const currentLogs: ExamLog[] = data.logs || [];
         setLogs(currentLogs);
 
-        // Check for new cheating flags to pop up real-time alerts
         currentLogs.forEach(log => {
           if (log.impersonation_flags > 0 && log.status === 'started') {
-            const hasAlert = activeAlerts.some(a => a.id === `${log.registration_number}-${log.impersonation_flags}`);
-            if (!hasAlert) {
-              const newAlert = {
-                id: `${log.registration_number}-${log.impersonation_flags}`,
-                message: `⚠️ Cheating warning: Student ${log.student_name} (${log.registration_number}) triggered a flag count of ${log.impersonation_flags} in exam ${log.exam_id}!`,
-                timestamp: new Date()
-              };
-              setActiveAlerts(prev => [newAlert, ...prev].slice(0, 5)); // Keep last 5 alerts
-            }
+            const alertId = `${log.registration_number}-${log.impersonation_flags}`;
+            setActiveAlerts(prev => {
+              const hasAlert = prev.some(a => a.id === alertId);
+              if (!hasAlert) {
+                const newAlert = {
+                  id: alertId,
+                  message: `⚠️ ${log.student_name} (${log.registration_number}) triggered ${log.impersonation_flags} flag(s) in ${log.exam_id}`,
+                  timestamp: new Date()
+                };
+                return [newAlert, ...prev].slice(0, 5);
+              }
+              return prev;
+            });
           }
         });
       }
@@ -102,102 +146,167 @@ export default function LecturerDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchLogs();
     const interval = setInterval(fetchLogs, 10000);
     return () => clearInterval(interval);
-  }, [activeAlerts]);
+  }, [fetchLogs]);
 
-  const handleOpenLog = (log: ExamLog) => {
+  const fetchExams = useCallback(async () => {
+    setLoadingExams(true);
+    try {
+      const res = await fetch('/api/exams/all/');
+      if (res.ok) {
+        const data = await res.json();
+        setAllExams(data.exams || []);
+      }
+    } catch (err) {
+      console.error('Error fetching exams:', err);
+    } finally {
+      setLoadingExams(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'manage_exams') {
+      fetchExams();
+    }
+  }, [activeTab, fetchExams]);
+
+  const handleClearAlerts = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setActiveAlerts([]);
+  }, []);
+
+  const handleOpenGrading = (log: ExamLog) => {
     setSelectedLog(log);
-    setGradeScore(log.score);
+    setGradingQIndex(0);
     setGradeLetter(log.grade_letter || 'A');
     setGradeFeedback(log.feedback || '');
+    // Initialize question scores
+    const initScores: Record<string, number> = {};
+    log.questions.forEach(q => {
+      initScores[q.id] = 0;
+    });
+    setQuestionScores(initScores);
+    setGradingView(true);
   };
 
-  const handleCloseLog = () => {
+  const handleCloseGrading = () => {
+    setGradingView(false);
     setSelectedLog(null);
   };
+
+  const totalGradingScore = Object.values(questionScores).reduce((a, b) => a + b, 0);
 
   const handleGradeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedLog) return;
     
-    if (gradeScore > selectedLog.max_score) {
-      alert(`The maximum score for this exam is ${selectedLog.max_score}. Please enter a valid score.`);
-      return;
-    }
+    const totalScore = selectedLog.max_score > 0 
+      ? (totalGradingScore / selectedLog.max_score) * 100
+      : totalGradingScore;
 
     setGradeSubmitting(true);
-
     try {
       const response = await fetch(`/api/exams/${selectedLog.exam_id}/grade/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           registration_number: selectedLog.registration_number,
-          score: gradeScore,
+          score: totalScore,
           grade_letter: gradeLetter,
           feedback: gradeFeedback
         })
       });
 
       if (response.ok) {
-        // Refresh logs and close modal
         await fetchLogs();
-        setSelectedLog(prev => prev ? { 
-          ...prev, 
-          score: gradeScore, 
-          grade_letter: gradeLetter, 
-          feedback: gradeFeedback,
-          status: 'graded'
-        } : null);
-        alert("Grading updated successfully!");
+        alert('Grading submitted successfully!');
+        handleCloseGrading();
       } else {
-        alert("Failed to save grading.");
+        alert('Failed to save grading.');
       }
     } catch (err) {
-      console.error(err);
-      alert("Error submitting grade.");
+      alert('Error submitting grade.');
     } finally {
       setGradeSubmitting(false);
     }
   };
 
+  // ─── Edit Exam Logic ──────────────────────────────────────────────────────
+  const handleEditExam = async (id: string) => {
+    try {
+      const res = await fetch(`/api/exams/${id}/full/`);
+      if (res.ok) {
+        const data = await res.json();
+        const exam = data;
+        setExamId(exam.exam_id);
+        setExamTitle(exam.title);
+        setExamDuration(exam.duration_minutes.toString());
+        setExamType(exam.exam_type as 'objective' | 'essay');
+        setAssignedTo(exam.assigned_to || 'ALL');
+        setSpecificStudents(exam.specific_students || '');
+        setQuestionsList(exam.questions || []);
+        setEditMode(true);
+        setActiveTab('create_exam');
+      } else {
+        alert('Failed to load exam details.');
+      }
+    } catch (err) {
+      alert('Error fetching exam details.');
+      console.error(err);
+    }
+  };
+
+  // ─── Question builder ─────────────────────────────────────────────────────
   const handleAddQuestion = () => {
     if (!qText.trim()) return;
 
+    if (examType === 'objective') {
+      const filledOptions = qOptions.filter(o => o.trim() !== '');
+      if (filledOptions.length < 2) {
+        alert('Please add at least 2 answer options.');
+        return;
+      }
+      if (qCorrectIndex < 0 || !qOptions[qCorrectIndex]?.trim()) {
+        alert('Please select the correct answer by clicking ★ next to an option.');
+        return;
+      }
+    }
+
     const newQ: Question = {
       id: `q${Date.now()}`,
-      type: examType,
+      type: examType === 'objective' ? 'multiple_choice' : 'essay',
       text: qText.trim(),
       points: parseInt(qPoints) || 1,
     };
 
     if (examType === 'objective') {
       newQ.options = qOptions.filter(o => o.trim() !== '');
-      newQ.correct_answer = qCorrect;
+      newQ.correct_answer = qOptions[qCorrectIndex].trim();
     }
 
     setQuestionsList([...questionsList, newQ]);
-
-    // Reset question fields
     setQText('');
     setQPoints('1');
     setQOptions(['', '', '', '']);
     setQCorrect('');
+    setQCorrectIndex(-1);
   };
 
   const handleRemoveQuestion = (idx: number) => {
     setQuestionsList(questionsList.filter((_, i) => i !== idx));
   };
 
+  // ─── Exam submission ──────────────────────────────────────────────────────
   const handleExamSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!examId || !examTitle || questionsList.length === 0) {
-      alert("Please fill all exam fields and add at least one question.");
+      alert('Please fill all exam fields and add at least one question.');
       return;
     }
 
@@ -211,28 +320,88 @@ export default function LecturerDashboard() {
           title: examTitle,
           duration_minutes: parseInt(examDuration) || 120,
           exam_type: examType,
-          questions: questionsList
+          questions: questionsList,
+          assigned_to: assignedTo,
+          specific_students: specificStudents
         })
       });
 
       if (response.ok) {
-        alert("Exam paper created successfully!");
-        setExamId('');
-        setExamTitle('');
-        setExamDuration('120');
-        setQuestionsList([]);
+        const data = await response.json();
+        alert('Paper has been successfully published');
+        resetExamForm();
+        setShowPreview(false);
         setActiveTab('monitoring');
         fetchLogs();
       } else {
-        alert("Failed to create exam paper.");
+        alert('Failed to create exam paper.');
       }
     } catch (err) {
-      console.error(err);
-      alert("Error sending exam request.");
+      alert('Error sending exam request.');
     } finally {
       setLoading(false);
     }
   };
+
+  const resetExamForm = () => {
+    setExamId('');
+    setExamTitle('');
+    setExamDuration('120');
+    setQuestionsList([]);
+    setAssignedTo('ALL');
+    setSpecificStudents('');
+    setEditMode(false);
+  };
+
+  // ─── Load existing exam for editing ──────────────────────────────────────
+  const fetchAllExams = async () => {
+    setLoadingExams(true);
+    try {
+      const res = await fetch('/api/exams/all/');
+      if (res.ok) {
+        const data = await res.json();
+        setAllExams(data.exams || []);
+      }
+    } finally {
+      setLoadingExams(false);
+    }
+  };
+
+  const fetchAllStudents = async () => {
+    try {
+      const res = await fetch('/api/students/');
+      if (res.ok) {
+        const data = await res.json();
+        setAllStudents(data.students || []);
+      }
+    } catch {}
+  };
+
+  const handleLoadExam = async (eid: string) => {
+    try {
+      const res = await fetch(`/api/exams/${eid}/full/`);
+      if (res.ok) {
+        const data = await res.json();
+        setExamId(data.exam_id);
+        setExamTitle(data.title);
+        setExamDuration(String(data.duration_minutes || 120));
+        setExamType(data.exam_type === 'objective' ? 'objective' : 'essay');
+        setQuestionsList(data.questions || []);
+        setAssignedTo(data.assigned_to || 'ALL');
+        setSpecificStudents(data.specific_students || '');
+        setEditMode(true);
+        setAllExams([]); // close picker
+      }
+    } catch {
+      alert('Failed to load exam.');
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'create_exam') {
+      fetchAllStudents();
+    }
+  }, [activeTab]);
 
   const handleSignOut = () => {
     localStorage.removeItem('auth_token');
@@ -247,169 +416,215 @@ export default function LecturerDashboard() {
     log.exam_id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const activeStudents = logs.filter(l => l.status === 'started');
   const totalStudents = new Set(logs.map(l => l.registration_number)).size;
   const flaggedStudents = logs.filter(l => l.impersonation_flags > 0).length;
 
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col pb-10">
-      
-      {/* Real-time Cheating Alerts banner container */}
+    <div className="min-h-screen font-sans flex flex-col pb-10" style={{ backgroundColor: 'var(--color-page-bg, #f1f5f9)' }}>
+
+      {/* ── Real-time Alert Banner ─────────────────────────────────────────── */}
       {activeAlerts.length > 0 && (
-        <div className="bg-red-600 text-white px-4 py-3 shadow-md flex flex-col gap-2.5 z-40 animate-pulse border-b border-red-700">
+        <div className="bg-red-600 text-white px-4 py-3 shadow-md flex flex-col gap-2 z-40 border-b border-red-700">
           <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-              <span className="font-bold text-sm">Real-time Invigilation Alert:</span>
-              <span className="text-xs font-semibold bg-red-700 px-2.5 py-0.5 rounded-full">Proctoring Flags Triggered</span>
+              <ShieldAlert className="w-5 h-5 flex-shrink-0 animate-bounce" />
+              <span className="font-bold text-sm">Real-time Invigilation Alert</span>
+              <span className="text-xs font-semibold bg-red-700 px-2.5 py-0.5 rounded-full">
+                {activeAlerts.length} Active {activeAlerts.length === 1 ? 'Flag' : 'Flags'}
+              </span>
             </div>
-            <button 
-              onClick={() => setActiveAlerts([])}
-              className="text-white hover:text-slate-200 text-xs font-bold underline"
+            <button
+              type="button"
+              onClick={handleClearAlerts}
+              className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-1.5 rounded-lg border border-white/30 transition-colors active:scale-95"
             >
               Clear Alerts
             </button>
           </div>
           <div className="max-w-7xl mx-auto w-full flex flex-col gap-1 pl-7">
-            {activeAlerts.map((alert, i) => (
-              <div key={alert.id} className="text-xs font-medium">
-                &bull; {alert.message} ({alert.timestamp.toLocaleTimeString()})
+            {activeAlerts.map(alert => (
+              <div key={alert.id} className="text-xs font-medium opacity-90">
+                &bull; {alert.message} <span className="opacity-60">({alert.timestamp.toLocaleTimeString()})</span>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Header */}
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-             <div className="bg-[#2c6fb7] text-white p-2 rounded-lg">
-                <ShieldCheck className="w-6 h-6" />
-             </div>
-             <div>
-               <h1 className="text-xl font-bold text-slate-800 tracking-tight">Victoria University</h1>
-               <p className="text-xs text-slate-500 font-medium tracking-wide">Proctoring & Exam Administration</p>
-             </div>
+            <div className="bg-[#2c6fb7] text-white p-2 rounded-lg">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-800 tracking-tight">Victoria University</h1>
+              <p className="text-[10px] text-slate-500 font-medium tracking-wide">Proctoring & Exam Administration &bull; <span className="text-[#2c6fb7] font-bold">v1.0.0</span></p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-             {/* Navigation Tabs */}
-             <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-sm">
-               <button
-                 onClick={() => setActiveTab('monitoring')}
-                 className={`px-4 py-1.5 rounded-md font-bold transition-all ${
-                   activeTab === 'monitoring' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                 }`}
-               >
-                 Live Monitoring
-               </button>
-               <button
-                 onClick={() => setActiveTab('create_exam')}
-                 className={`px-4 py-1.5 rounded-md font-bold transition-all ${
-                   activeTab === 'create_exam' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
-                 }`}
-               >
-                 Set Exam Paper
-               </button>
-             </div>
-
-             <div className="h-6 w-px bg-slate-200"></div>
-
-             <button
-               onClick={handleSignOut}
-               className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-lg text-xs font-bold transition-colors"
-             >
-               <LogOut className="w-4 h-4" /> Sign Out
-             </button>
+          <div className="flex items-center gap-3">
+            <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 text-sm">
+              <button
+                onClick={() => setActiveTab('monitoring')}
+                className={`px-4 py-1.5 rounded-md font-bold transition-all ${
+                  activeTab === 'monitoring' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Live Monitoring
+              </button>
+              <button
+                onClick={() => setActiveTab('create_exam')}
+                className={`px-4 py-1.5 rounded-md font-bold transition-all ${
+                  activeTab === 'create_exam' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {editMode ? 'Edit Exam' : 'Set Exam Paper'}
+              </button>
+              <button
+                onClick={() => setActiveTab('manage_exams')}
+                className={`px-4 py-1.5 rounded-md font-bold transition-all ${
+                  activeTab === 'manage_exams' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Manage Exams
+              </button>
+            </div>
+            <div className="h-6 w-px bg-slate-200" />
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-700 rounded-lg text-xs font-bold transition-colors"
+            >
+              <LogOut className="w-4 h-4" /> Sign Out
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Area */}
+      {/* ── Main Content ──────────────────────────────────────────────────── */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-        
-        {activeTab === 'monitoring' ? (
-          <div>
+
+        {/* ══════════════ MONITORING TAB ══════════════ */}
+        {activeTab === 'monitoring' && (
+          <div className="space-y-6">
+
             {/* Stats Row */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
+                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
                   <Users className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-500">Active Students</p>
+                  <p className="text-xs font-semibold text-slate-500">Total Students</p>
                   <p className="text-2xl font-bold text-slate-800">{totalStudents}</p>
                 </div>
               </div>
-              
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                 <div className="w-12 h-12 bg-red-50 text-red-600 rounded-lg flex items-center justify-center">
-                    <ShieldAlert className="w-6 h-6" />
-                 </div>
-                 <div>
-                    <p className="text-sm font-semibold text-slate-500">Flagged Exceptions</p>
-                    <p className="text-2xl font-bold text-slate-800">{flaggedStudents}</p>
-                 </div>
+                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                  <UserCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Active Now</p>
+                  <p className="text-2xl font-bold text-emerald-600">{activeStudents.length}</p>
+                </div>
               </div>
-
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                 <div className="w-12 h-12 bg-green-50 text-green-600 rounded-lg flex items-center justify-center">
-                    <CheckCircle className="w-6 h-6" />
-                 </div>
-                 <div>
-                    <p className="text-sm font-semibold text-slate-500">Graded/Completed</p>
-                    <p className="text-2xl font-bold text-slate-800">{logs.filter(l => l.status === 'graded').length}</p>
-                 </div>
+                <div className="w-12 h-12 bg-red-50 text-red-600 rounded-xl flex items-center justify-center">
+                  <ShieldAlert className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Flagged</p>
+                  <p className="text-2xl font-bold text-red-600">{flaggedStudents}</p>
+                </div>
               </div>
-
               <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
-                 <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center">
-                    <Activity className="w-6 h-6" />
-                 </div>
-                 <div>
-                    <p className="text-sm font-semibold text-slate-500">Total Attempts</p>
-                    <p className="text-2xl font-bold text-slate-800">{logs.length}</p>
-                 </div>
+                <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500">Graded</p>
+                  <p className="text-2xl font-bold text-slate-800">{logs.filter(l => l.status === 'graded').length}</p>
+                </div>
               </div>
             </div>
 
-            {/* Logs Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
-              <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-                 <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                   Live Proctoring Sessions
-                   {loading && <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />}
-                 </h2>
-                 <div className="relative w-full sm:w-auto">
-                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                   <input 
-                     type="text" 
-                     placeholder="Search by name, ID, or exam..."
-                     className="pl-9 pr-4 py-2 w-full sm:w-64 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                     value={searchTerm}
-                     onChange={(e) => setSearchTerm(e.target.value)}
-                   />
-                 </div>
+            {/* ── Active Students Live Panel ────────────────────────────── */}
+            {activeStudents.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-emerald-200 overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-emerald-100 bg-emerald-50 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                  <h2 className="font-bold text-emerald-800 text-sm">Students Currently Taking Exam ({activeStudents.length})</h2>
+                  <span className="ml-auto text-[10px] text-emerald-600 font-medium">Live — refreshes every 10s</span>
+                </div>
+                <div className="p-4 flex flex-wrap gap-3">
+                  {activeStudents.map(log => (
+                    <button
+                      key={log.id}
+                      onClick={() => handleOpenGrading(log)}
+                      className="flex items-center gap-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 hover:border-emerald-400 rounded-xl px-4 py-2.5 transition-all group"
+                    >
+                      <div className="relative">
+                        <div className="w-8 h-8 rounded-full bg-[#2c6fb7] text-white flex items-center justify-center font-bold text-sm">
+                          {log.student_name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white animate-pulse" />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-bold text-slate-800 group-hover:text-[#2c6fb7] transition-colors">{log.student_name}</p>
+                        <p className="text-[10px] text-slate-500 font-mono">{log.registration_number} &bull; {log.exam_id}</p>
+                      </div>
+                      {log.impersonation_flags > 0 && (
+                        <span className="ml-1 text-[10px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded-full">
+                          {log.impersonation_flags}⚠
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-              
+            )}
+
+            {/* ── Logs Table ───────────────────────────────────────────── */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  All Exam Sessions
+                  {loading && <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />}
+                </h2>
+                <div className="relative w-full sm:w-auto">
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by name, ID, or exam..."
+                    className="pl-9 pr-4 py-2 w-full sm:w-64 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
-                      <th className="px-6 py-4 font-bold border-b border-slate-200">Student Details</th>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200">Exam Name / ID</th>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200">Session Status</th>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200">Cheat Flags</th>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200">Grading Score</th>
-                      <th className="px-6 py-4 font-bold border-b border-slate-200 text-right">Actions</th>
+                      <th className="px-6 py-4 font-bold border-b border-slate-200">Student</th>
+                      <th className="px-6 py-4 font-bold border-b border-slate-200">Exam</th>
+                      <th className="px-6 py-4 font-bold border-b border-slate-200">Status</th>
+                      <th className="px-6 py-4 font-bold border-b border-slate-200">Flags</th>
+                      <th className="px-6 py-4 font-bold border-b border-slate-200">Score</th>
+                      <th className="px-6 py-4 font-bold border-b border-slate-200 text-right">Review</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredLogs.map(log => (
-                      <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
+                      <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-6 py-4">
                           <div className="font-bold text-slate-800">{log.student_name}</div>
-                          <div className="text-xs text-slate-500 font-mono font-bold">{log.registration_number}</div>
+                          <div className="text-xs text-slate-500 font-mono">{log.registration_number}</div>
+                          {log.faculty && <div className="text-[10px] text-[#2c6fb7] font-bold mt-0.5">{log.faculty}</div>}
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm font-semibold text-slate-700">{log.exam_name}</div>
@@ -421,39 +636,38 @@ export default function LecturerDashboard() {
                             log.status === 'submitted' ? 'bg-blue-100 text-blue-700' :
                             'bg-amber-100 text-amber-700'
                           }`}>
-                            {log.status === 'graded' ? 'Graded' :
-                             log.status === 'submitted' ? 'Pending Review' : 'Active'}
+                            {log.status === 'started' && <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />}
+                            {log.status === 'graded' ? 'Graded' : log.status === 'submitted' ? 'Pending Review' : 'Active'}
                           </span>
                         </td>
                         <td className="px-6 py-4">
                           {log.impersonation_flags > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 animate-pulse">
-                              <ShieldAlert className="w-3.5 h-3.5" /> {log.impersonation_flags} Infractions
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                              <ShieldAlert className="w-3.5 h-3.5" /> {log.impersonation_flags}
                             </span>
                           ) : (
-                            <span className="text-slate-400 text-xs font-medium">Clear</span>
+                            <span className="text-slate-400 text-xs font-medium">Clean</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
                           {log.status === 'graded' ? (
-                            <div className="text-sm font-bold text-slate-800">
-                              {log.score.toFixed(1)}% ({log.grade_letter})
-                            </div>
+                            <div className="text-sm font-bold text-slate-800">{log.score.toFixed(1)}% ({log.grade_letter})</div>
                           ) : (
-                            <span className="text-slate-400 text-xs">Unfinished/Pending</span>
+                            <span className="text-slate-400 text-xs">Pending</span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-right">
                           <button
-                            onClick={() => handleOpenLog(log)}
-                            className="inline-flex items-center gap-1 text-[#2c6fb7] hover:text-[#1a5ba0] font-bold text-xs bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 transition-colors"
+                            onClick={() => handleOpenGrading(log)}
+                            title="Review & Grade"
+                            className="inline-flex items-center gap-1.5 text-[#2c6fb7] hover:text-white hover:bg-[#2c6fb7] font-bold text-xs bg-blue-50 hover:shadow-md px-3 py-1.5 rounded-lg border border-blue-100 transition-all"
                           >
-                            <Eye className="w-3.5 h-3.5" /> Drilldown / Grade
+                            <ClipboardCheck className="w-4 h-4" />
+                            <span className="hidden sm:inline">Review</span>
                           </button>
                         </td>
                       </tr>
                     ))}
-                    
                     {filteredLogs.length === 0 && (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">
@@ -466,380 +680,739 @@ export default function LecturerDashboard() {
               </div>
             </div>
           </div>
-        ) : (
-          /* Set Exam Paper View */
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 max-w-4xl mx-auto overflow-hidden">
-            <div className="bg-[#2c6fb7] px-8 py-5 text-white flex justify-between items-center">
-              <div>
-                <h2 className="text-lg font-bold">Set Examination Paper</h2>
-                <p className="text-blue-100 text-xs mt-0.5">Author assessment structures and publish them directly to student portals.</p>
-              </div>
-              <BookOpen className="w-8 h-8 text-blue-100 opacity-80" />
-            </div>
+        )}
 
-            <form onSubmit={handleExamSubmit} className="p-8 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Course Code / ID</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g., DBMS201"
-                    required
-                    value={examId}
-                    onChange={(e) => setExamId(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Exam Title</label>
-                  <input 
-                    type="text" 
-                    placeholder="e.g., Database Systems I - Final Examination"
-                    required
-                    value={examTitle}
-                    onChange={(e) => setExamTitle(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Duration (Minutes)</label>
-                  <input 
-                    type="number" 
-                    required
-                    value={examDuration}
-                    onChange={(e) => setExamDuration(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5">Assessment Style</label>
-                  <select
-                    value={examType}
-                    onChange={(e) => {
-                      setExamType(e.target.value as 'objective' | 'essay');
-                      setQuestionsList([]);
-                    }}
-                    className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400"
-                  >
-                    <option value="objective">Objective Type (Auto Graded MCQs)</option>
-                    <option value="essay">Essay Type (Instructor Graded Responses)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Added Questions List */}
-              <div className="border-t border-slate-100 pt-6">
-                <h3 className="text-md font-bold text-slate-800 mb-3 flex items-center gap-1.5">
-                  <ListOrdered className="w-5 h-5 text-[#2c6fb7]" /> Draft Questions ({questionsList.length})
+        {/* ══════════════ MANAGE EXAMS TAB ══════════════ */}
+        {activeTab === 'manage_exams' && (
+          <div className="max-w-4xl mx-auto space-y-6">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-[#2c6fb7]" /> Published Examination Papers
                 </h3>
-                {questionsList.length === 0 ? (
-                  <div className="bg-slate-50 border border-dashed border-slate-200 text-center py-6 text-slate-400 text-sm font-medium rounded-lg">
-                    No questions added yet. Construct questions below to build the exam paper.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {questionsList.map((q, idx) => (
-                      <div key={q.id} className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="text-xs font-bold text-indigo-600 mb-1">
-                            Q{idx + 1} &bull; {q.points} {q.points === 1 ? 'Point' : 'Points'}
-                          </div>
-                          <p className="text-slate-800 font-semibold text-sm">{q.text}</p>
-                          {q.type === 'objective' && q.options && (
-                            <div className="grid grid-cols-2 gap-1.5 mt-2.5 pl-2">
-                              {q.options.map((opt, i) => (
-                                <div key={i} className={`text-xs p-1.5 rounded ${
-                                  opt === q.correct_answer ? 'bg-green-100 text-green-800 font-bold border border-green-200' : 'bg-white text-slate-500 border border-slate-150'
-                                }`}>
-                                  {opt} {opt === q.correct_answer && '✔️'}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveQuestion(idx)}
-                          className="text-red-500 hover:text-red-700 p-1 bg-white hover:bg-red-50 rounded border border-slate-200 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => { fetchExams(); }}
+                  className="flex items-center gap-1.5 text-[#2c6fb7] text-sm font-bold hover:underline"
+                >
+                  <RefreshCw className="w-4 h-4" /> Refresh List
+                </button>
               </div>
 
-              {/* Question Construction Section */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
-                <h4 className="font-bold text-slate-800 text-sm">Create Question</h4>
-                
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">Question Description</label>
-                  <textarea
-                    placeholder="Enter question text description..."
-                    value={qText}
-                    onChange={(e) => setQText(e.target.value)}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 h-20 resize-none bg-white"
-                  />
+              {loadingExams && (
+                <div className="p-6 text-center text-slate-400 text-sm">
+                  <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" /> Loading exams...
                 </div>
+              )}
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {!loadingExams && allExams.length === 0 && (
+                <div className="p-10 text-center flex flex-col items-center">
+                  <BookOpen className="w-10 h-10 text-slate-300 mb-3" />
+                  <p className="text-slate-500 font-medium">No published exams found.</p>
+                  <button onClick={() => setActiveTab('create_exam')} className="mt-4 text-[#2c6fb7] font-bold text-sm hover:underline">
+                    Create your first exam
+                  </button>
+                </div>
+              )}
+
+              {allExams.length > 0 && (
+                <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
+                  {allExams.map(exam => (
+                    <button
+                      key={exam.exam_id}
+                      type="button"
+                      onClick={() => handleEditExam(exam.exam_id)}
+                      className="w-full text-left flex items-center justify-between px-5 py-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg transition-all group"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-800 text-base group-hover:text-[#2c6fb7] mb-1">{exam.title}</p>
+                        <p className="text-xs font-medium text-slate-500 flex gap-3">
+                          <span><span className="font-bold text-slate-400">ID:</span> {exam.exam_id}</span>
+                          <span>&bull;</span>
+                          <span><span className="font-bold text-slate-400">Type:</span> {exam.exam_type}</span>
+                          <span>&bull;</span>
+                          <span><span className="font-bold text-slate-400">Questions:</span> {exam.question_count}</span>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm font-bold text-slate-400 group-hover:text-[#2c6fb7] bg-white px-3 py-1.5 border border-slate-200 rounded-md shadow-sm">
+                        <Edit3 className="w-4 h-4" /> Edit Paper
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════ CREATE/EDIT EXAM TAB ══════════════ */}
+        {activeTab === 'create_exam' && (
+          <div className="max-w-4xl mx-auto space-y-6">
+
+            {/* ── Exam Form ───────────────────────────────────────────── */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className={`px-8 py-5 text-white flex justify-between items-center ${editMode ? 'bg-indigo-700' : 'bg-[#2c6fb7]'}`}>
+                <div>
+                  <h2 className="text-lg font-bold">{editMode ? '✏️ Editing Exam Paper' : 'Set Examination Paper'}</h2>
+                  <p className="text-blue-100 text-xs mt-0.5">
+                    {editMode ? `Modifying: ${examId}` : 'Author assessment structures and publish them to student portals.'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {editMode && (
+                    <button
+                      type="button"
+                      onClick={resetExamForm}
+                      className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg font-bold"
+                    >
+                      New Exam
+                    </button>
+                  )}
+                  <BookOpen className="w-8 h-8 text-blue-100 opacity-80" />
+                </div>
+              </div>
+
+              <form onSubmit={handleExamSubmit} className="p-8 space-y-6">
+                {/* Exam Meta */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">Marks/Points</label>
-                    <input 
-                      type="number"
-                      value={qPoints}
-                      onChange={(e) => setQPoints(e.target.value)}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 bg-white"
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Course Code / Exam ID</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., DBMS201"
+                      required
+                      value={examId}
+                      onChange={(e) => setExamId(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Exam Title</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Database Systems I – Final Examination"
+                      required
+                      value={examTitle}
+                      onChange={(e) => setExamTitle(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400"
                     />
                   </div>
                 </div>
 
-                {examType === 'objective' && (
-                  <div className="space-y-3 pt-2">
-                    <label className="block text-xs font-bold text-slate-500">Multiple Choice Options (Fill correct answer in options)</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {qOptions.map((opt, i) => (
-                        <div key={i} className="flex gap-2">
-                          <span className="text-xs font-bold text-slate-400 flex items-center">{String.fromCharCode(65 + i)}.</span>
-                          <input
-                            type="text"
-                            placeholder={`Option ${i+1}`}
-                            value={opt}
-                            onChange={(e) => {
-                              const newOpts = [...qOptions];
-                              newOpts[i] = e.target.value;
-                              setQOptions(newOpts);
-                            }}
-                            className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-400 bg-white"
-                          />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Duration (Minutes)</label>
+                    <input
+                      type="number"
+                      required
+                      value={examDuration}
+                      onChange={(e) => setExamDuration(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1.5">Assessment Style</label>
+                    <select
+                      value={examType}
+                      onChange={(e) => {
+                        setExamType(e.target.value as 'objective' | 'essay');
+                        setQuestionsList([]);
+                      }}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400"
+                    >
+                      <option value="objective">Objective (Auto-Graded MCQs)</option>
+                      <option value="essay">Essay (Instructor-Graded)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* ── Assignment Section ──────────────────────────────── */}
+                <div className="border border-slate-200 rounded-xl p-5 space-y-4 bg-slate-50">
+                  <h4 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-[#2c6fb7]" /> Assign Paper To
+                  </h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    {['ALL', 'FACULTY', 'SPECIFIC'].map(mode => (
+                      <label key={mode} className={`flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-all ${assignedTo === mode || (mode === 'FACULTY' && !['ALL','SPECIFIC'].includes(assignedTo)) ? 'border-[#2c6fb7] bg-blue-50 text-[#2c6fb7]' : 'border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                        <input
+                          type="radio"
+                          name="assignMode"
+                          value={mode}
+                          checked={mode === 'FACULTY' ? !['ALL','SPECIFIC'].includes(assignedTo) : assignedTo === mode}
+                          onChange={() => {
+                            if (mode === 'FACULTY') setAssignedTo('FST');
+                            else setAssignedTo(mode);
+                          }}
+                          className="sr-only"
+                        />
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${(mode === 'FACULTY' ? !['ALL','SPECIFIC'].includes(assignedTo) : assignedTo === mode) ? 'border-[#2c6fb7]' : 'border-slate-300'}`}>
+                          {(mode === 'FACULTY' ? !['ALL','SPECIFIC'].includes(assignedTo) : assignedTo === mode) && <div className="w-2 h-2 bg-[#2c6fb7] rounded-full" />}
+                        </div>
+                        <span className="text-xs font-bold">
+                          {mode === 'ALL' ? 'All Students' : mode === 'FACULTY' ? 'By Faculty' : 'Specific Students'}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Faculty picker */}
+                  {!['ALL', 'SPECIFIC'].includes(assignedTo) && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Select Faculty</label>
+                      <select
+                        value={assignedTo}
+                        onChange={(e) => setAssignedTo(e.target.value)}
+                        className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 bg-white"
+                      >
+                        {FACULTIES.filter(f => f.code !== 'ALL').map(f => (
+                          <option key={f.code} value={f.code}>{f.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Specific students */}
+                  {assignedTo === 'SPECIFIC' && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                        Select Specific Students ({allStudents.length} registered)
+                      </label>
+                      <div className="bg-white border border-slate-200 rounded-lg max-h-48 overflow-y-auto divide-y divide-slate-100">
+                        {allStudents.map(s => {
+                          const selected = specificStudents.split(',').map(x => x.trim()).includes(s.registration_number);
+                          return (
+                            <label key={s.registration_number} className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50 ${selected ? 'bg-blue-50' : ''}`}>
+                              <input
+                                type="checkbox"
+                                checked={selected}
+                                onChange={(e) => {
+                                  const current = specificStudents.split(',').map(x => x.trim()).filter(Boolean);
+                                  if (e.target.checked) {
+                                    setSpecificStudents([...current, s.registration_number].join(','));
+                                  } else {
+                                    setSpecificStudents(current.filter(r => r !== s.registration_number).join(','));
+                                  }
+                                }}
+                                className="rounded border-slate-300"
+                              />
+                              <div>
+                                <p className="text-sm font-semibold text-slate-800">{s.full_name}</p>
+                                <p className="text-[10px] text-slate-500">{s.registration_number} &bull; {s.faculty}</p>
+                              </div>
+                            </label>
+                          );
+                        })}
+                        {allStudents.length === 0 && (
+                          <p className="px-4 py-4 text-sm text-slate-400 text-center">No registered students found.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Question List ───────────────────────────────────── */}
+                <div className="border-t border-slate-100 pt-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-md font-bold text-slate-800 flex items-center gap-1.5">
+                      <ListOrdered className="w-5 h-5 text-[#2c6fb7]" /> Questions ({questionsList.length})
+                    </h3>
+                    {questionsList.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => { setShowPreview(true); setPreviewQIndex(0); }}
+                        className="flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-200 transition-colors"
+                      >
+                        <ZoomIn className="w-4 h-4" /> Preview Paper
+                      </button>
+                    )}
+                  </div>
+                  {questionsList.length === 0 ? (
+                    <div className="bg-slate-50 border border-dashed border-slate-200 text-center py-8 text-slate-400 text-sm font-medium rounded-lg">
+                      No questions added yet. Build the exam below.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {questionsList.map((q, idx) => (
+                        <div key={q.id} className="bg-slate-50 border border-slate-200 rounded-lg p-4 flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="text-xs font-bold text-indigo-600 mb-1">
+                              Q{idx + 1} &bull; {q.points} {q.points === 1 ? 'pt' : 'pts'} &bull; {q.type === 'multiple_choice' ? 'MCQ' : 'Essay'}
+                            </div>
+                            <p className="text-slate-800 font-semibold text-sm">{q.text}</p>
+                            {q.type === 'multiple_choice' && q.options && (
+                              <div className="grid grid-cols-2 gap-1.5 mt-2 pl-2">
+                                {q.options.map((opt, i) => (
+                                  <div key={i} className={`text-xs p-1.5 rounded ${opt === q.correct_answer ? 'bg-green-100 text-green-800 font-bold border border-green-200' : 'bg-white text-slate-500 border border-slate-200'}`}>
+                                    {String.fromCharCode(65 + i)}. {opt} {opt === q.correct_answer && '✓'}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveQuestion(idx)}
+                            className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg border border-slate-200 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       ))}
                     </div>
+                  )}
+                </div>
 
-                    <div className="pt-2">
-                      <label className="block text-xs font-bold text-slate-500 mb-1">Specify Correct Answer Value</label>
-                      <input 
-                        type="text"
-                        placeholder="Must match one of the option inputs exactly..."
-                        value={qCorrect}
-                        onChange={(e) => setQCorrect(e.target.value)}
+                {/* ── Question Builder ────────────────────────────────── */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+                  <h4 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                    <PlusCircle className="w-4 h-4 text-indigo-600" /> Add Question
+                  </h4>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Question Text</label>
+                    <textarea
+                      placeholder="Type your question here..."
+                      value={qText}
+                      onChange={(e) => setQText(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 h-24 resize-none bg-white"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">Marks / Points</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={qPoints}
+                        onChange={(e) => setQPoints(e.target.value)}
                         className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400 bg-white"
                       />
                     </div>
                   </div>
-                )}
 
-                <button
-                  type="button"
-                  onClick={handleAddQuestion}
-                  className="w-full py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold text-xs border border-indigo-200 transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <PlusCircle className="w-4 h-4" /> Add Question to Paper
-                </button>
-              </div>
+                  {examType === 'objective' && (
+                    <div className="space-y-3 pt-2">
+                      <label className="block text-xs font-bold text-slate-600">
+                        Answer Options — click ★ to mark the correct answer
+                      </label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        {qOptions.map((opt, i) => (
+                          <div key={i} className={`flex gap-2 items-center p-2 rounded-lg border transition-all ${qCorrectIndex === i ? 'border-green-400 bg-green-50' : 'border-slate-200 bg-white'}`}>
+                            <span className="text-xs font-bold text-slate-400 w-5 text-center">{String.fromCharCode(65 + i)}.</span>
+                            <input
+                              type="text"
+                              placeholder={`Option ${String.fromCharCode(65 + i)}`}
+                              value={opt}
+                              onChange={(e) => {
+                                const newOpts = [...qOptions];
+                                newOpts[i] = e.target.value;
+                                setQOptions(newOpts);
+                              }}
+                              className="flex-1 text-sm border-0 outline-none bg-transparent"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setQCorrectIndex(i)}
+                              title="Mark as correct answer"
+                              className={`text-base transition-all ${qCorrectIndex === i ? 'text-green-600' : 'text-slate-300 hover:text-amber-400'}`}
+                            >
+                              {qCorrectIndex === i ? '✓' : '★'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      {qCorrectIndex >= 0 && qOptions[qCorrectIndex] && (
+                        <p className="text-xs text-green-700 font-semibold">
+                          ✓ Correct answer: "{qOptions[qCorrectIndex]}"
+                        </p>
+                      )}
+                    </div>
+                  )}
 
-              <div className="pt-6 border-t border-slate-100">
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full py-4 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white font-bold rounded-lg shadow-md transition-colors flex items-center justify-center gap-1.5"
-                >
-                  {loading ? 'Publishing Paper...' : <>Publish Assessment to Students <CheckSquare className="w-5 h-5" /></>}
-                </button>
-              </div>
-            </form>
+                  <button
+                    type="button"
+                    onClick={handleAddQuestion}
+                    className="w-full py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold text-sm border border-indigo-200 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <PlusCircle className="w-4 h-4" /> Add Question to Paper
+                  </button>
+                </div>
+
+                {/* Submit row */}
+                <div className="pt-6 mt-6 border-t border-slate-100 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setShowPreview(true); setPreviewQIndex(0); }}
+                    className="px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <Eye className="w-5 h-5" /> Preview Exam
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="px-6 py-2.5 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white font-bold rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                    {editMode ? 'Publish Changes' : 'Publish Exam'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
-
       </main>
 
-      {/* Drilldown Slide-Over / Modal */}
-      {selectedLog && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-end">
-          <div className="bg-white w-full max-w-3xl h-full flex flex-col shadow-2xl overflow-hidden animate-slide-in">
-            {/* Modal Header */}
-            <div className="bg-slate-900 px-6 py-4 text-white flex justify-between items-center">
+      {/* ══════════════ PREVIEW MODAL ══════════════ */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="bg-[#1a365d] px-6 py-4 flex items-center justify-between">
               <div>
-                <h3 className="font-bold text-lg">{selectedLog.student_name}</h3>
-                <p className="text-slate-400 text-xs font-mono font-bold mt-0.5">{selectedLog.registration_number}</p>
+                <h2 className="font-bold text-white text-lg">{examTitle || 'Exam Preview'}</h2>
+                <p className="text-blue-200 text-xs">{examId} &bull; Preview Mode (read-only)</p>
               </div>
-              <button
-                onClick={handleCloseLog}
-                className="text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-800 transition-colors"
-              >
+              <button onClick={() => setShowPreview(false)} className="text-slate-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors">
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            {/* Modal Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-8">
-              
-              {/* Telemetry / Cheat Flags Alert */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
-                <h4 className="font-bold text-slate-800 text-[15px] flex items-center gap-1.5 border-b border-slate-200 pb-2">
-                  <ShieldAlert className="w-5 h-5 text-red-600" /> Proctoring & Session Flags
-                </h4>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="bg-white p-3 rounded-lg border border-slate-200">
-                    <p className="text-xs text-slate-500 font-bold">Impersonation Flags</p>
-                    <p className="text-xl font-bold text-red-600 mt-1">{selectedLog.impersonation_flags}</p>
+            <div className="flex-1 overflow-y-auto p-6">
+              {questionsList.length === 0 ? (
+                <p className="text-slate-400 text-center py-10">No questions added yet.</p>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm font-bold text-slate-600">Question {previewQIndex + 1} of {questionsList.length}</span>
+                    <span className="text-xs bg-blue-50 text-[#2c6fb7] px-3 py-1 rounded-full font-bold border border-blue-100">
+                      {questionsList[previewQIndex].points} {questionsList[previewQIndex].points === 1 ? 'Point' : 'Points'}
+                    </span>
                   </div>
-                  <div className="bg-white p-3 rounded-lg border border-slate-200">
-                    <p className="text-xs text-slate-500 font-bold">Face Verification</p>
-                    <p className={`text-md font-bold mt-1.5 ${selectedLog.is_verified ? 'text-green-600' : 'text-red-500'}`}>
-                      {selectedLog.is_verified ? 'Passed' : 'Bypassed/Failed'}
-                    </p>
+
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full mb-6">
+                    <div className="h-full bg-[#2c6fb7] rounded-full transition-all" style={{ width: `${((previewQIndex + 1) / questionsList.length) * 100}%` }} />
                   </div>
-                  <div className="bg-white p-3 rounded-lg border border-slate-200">
-                    <p className="text-xs text-slate-500 font-bold">Verification Tries</p>
-                    <p className="text-xl font-bold text-slate-800 mt-1">{selectedLog.verification_attempts}</p>
-                  </div>
+
+                  <p className="text-slate-800 font-semibold text-base leading-relaxed mb-6">
+                    {questionsList[previewQIndex].text}
+                  </p>
+
+                  {questionsList[previewQIndex].type === 'multiple_choice' && (
+                    <div className="space-y-3">
+                      {questionsList[previewQIndex].options?.map((opt, i) => (
+                        <div key={i} className="flex items-center gap-3 p-4 border border-slate-200 rounded-xl bg-slate-50">
+                          <div className="w-5 h-5 rounded-full border-2 border-slate-300 flex-shrink-0" />
+                          <span className="text-slate-700 font-medium">{String.fromCharCode(65 + i)}. {opt}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {questionsList[previewQIndex].type === 'essay' && (
+                    <div className="border-2 border-dashed border-slate-200 rounded-xl p-4 bg-slate-50 min-h-32 flex items-start">
+                      <p className="text-slate-400 text-sm italic">Student will type essay response here...</p>
+                    </div>
+                  )}
                 </div>
+              )}
+            </div>
+
+            <div className="border-t border-slate-100 p-4 flex items-center justify-between bg-slate-50">
+              <button
+                onClick={() => setPreviewQIndex(i => Math.max(0, i - 1))}
+                disabled={previewQIndex === 0}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold disabled:opacity-40"
+              >
+                <ChevronLeft className="w-4 h-4" /> Previous
+              </button>
+              <div className="flex items-center gap-4">
+                <span className="text-xs text-slate-500 font-medium">
+                  {previewQIndex + 1} / {questionsList.length}
+                </span>
+                <button
+                  onClick={handleExamSubmit}
+                  disabled={loading}
+                  className="px-6 py-2 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white font-bold rounded-lg shadow-md transition-colors flex items-center gap-2"
+                >
+                  {loading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                  Publish Exam
+                </button>
               </div>
-
-              {/* Event Timeline */}
-              <div>
-                <h4 className="font-bold text-slate-800 text-[15px] flex items-center gap-1.5 border-b border-slate-200 pb-2 mb-4">
-                  <Activity className="w-5 h-5 text-[#2c6fb7]" /> Proctoring Activity Timeline
-                </h4>
-                {selectedLog.timeline.length === 0 ? (
-                  <p className="text-slate-400 text-xs italic">No proctoring events recorded for this session.</p>
-                ) : (
-                  <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 pl-8">
-                    {selectedLog.timeline.map((event, idx) => (
-                      <div key={idx} className="relative group">
-                        {/* Dot indicator */}
-                        <div className={`absolute -left-[27px] top-1.5 w-3 h-3 rounded-full border-2 border-white ${
-                          event.event.includes("Cheating") || event.event.includes("Detected") || event.event.includes("Lost")
-                            ? 'bg-red-500 animate-pulse ring-4 ring-red-100' : 'bg-blue-500'
-                        }`} />
-                        <div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-bold text-slate-800 text-xs">{event.event}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">{new Date(event.timestamp).toLocaleTimeString()}</span>
-                          </div>
-                          <p className="text-slate-500 text-xs mt-0.5 font-medium leading-relaxed">{event.details}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Student Answers vs Questions */}
-              <div>
-                <h4 className="font-bold text-slate-800 text-[15px] flex items-center gap-1.5 border-b border-slate-200 pb-2 mb-4">
-                  <FileSpreadsheet className="w-5 h-5 text-[#2c6fb7]" /> Student Exam Answers
-                </h4>
-                {selectedLog.questions.length === 0 ? (
-                  <p className="text-slate-400 text-xs italic">No exam questions mapped to this log.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {selectedLog.questions.map((q, idx) => {
-                      const studentAns = selectedLog.answers[q.id];
-                      const isCorrect = q.type === 'objective' ? (studentAns === q.correct_answer) : null;
-                      
-                      return (
-                        <div key={q.id} className="bg-slate-50/50 border border-slate-200 rounded-lg p-4">
-                          <div className="text-xs font-bold text-slate-500 mb-1">
-                            Question {idx + 1} &bull; {q.points} {q.points === 1 ? 'Point' : 'Points'}
-                          </div>
-                          <p className="text-slate-800 font-semibold text-sm mb-3">{q.text}</p>
-                          
-                          <div className="space-y-2 text-xs">
-                            {q.type === 'objective' ? (
-                              <>
-                                <div className="p-2 bg-slate-100 rounded text-slate-700">
-                                  <strong>Option Options:</strong> {q.options?.join(', ')}
-                                </div>
-                                <div className={`p-2 rounded font-semibold ${isCorrect ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                  <strong>Student Answer:</strong> {studentAns || '[No Answer Submitted]'}
-                                </div>
-                                <div className="p-2 bg-emerald-50 text-emerald-800 rounded font-semibold border border-emerald-100">
-                                  <strong>Correct Answer:</strong> {q.correct_answer}
-                                </div>
-                              </>
-                            ) : (
-                              <div className="p-3 bg-white border border-slate-200 rounded-lg text-slate-700 leading-relaxed font-semibold">
-                                <span className="block text-slate-500 text-[10px] font-bold uppercase mb-1">Student Essay Response</span>
-                                {studentAns || '[Blank response]'}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Grading Form */}
-              <div className="border-t border-slate-200 pt-6">
-                <h4 className="font-bold text-slate-800 text-[15px] flex items-center gap-1.5 mb-4">
-                  <Award className="w-5 h-5 text-[#2c6fb7]" /> Instructor Evaluation & Grading
-                </h4>
-                
-                <form onSubmit={handleGradeSubmit} className="bg-slate-50 p-5 rounded-xl border border-slate-200 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Overall Score (%)</label>
-                      <input 
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max={selectedLog.max_score}
-                        value={gradeScore}
-                        onChange={(e) => setGradeScore(parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">Letter Grade</label>
-                      <select
-                        value={gradeLetter}
-                        onChange={(e) => setGradeLetter(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white"
-                      >
-                        <option value="A">A (Excellent)</option>
-                        <option value="B">B (Good)</option>
-                        <option value="C">C (Satisfactory)</option>
-                        <option value="D">D (Passing)</option>
-                        <option value="F">F (Failed)</option>
-                        <option value="Pending">Pending Grading</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">Lecturer Feedback & Comments</label>
-                    <textarea 
-                      placeholder="Enter student feedback..."
-                      value={gradeFeedback}
-                      onChange={(e) => setGradeFeedback(e.target.value)}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white h-24 resize-none"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={gradeSubmitting}
-                    className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm shadow-md transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    {gradeSubmitting ? 'Saving...' : 'Submit Student Evaluation'}
-                  </button>
-                </form>
-              </div>
-
+              <button
+                onClick={() => setPreviewQIndex(i => Math.min(questionsList.length - 1, i + 1))}
+                disabled={previewQIndex === questionsList.length - 1}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold disabled:opacity-40"
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* ══════════════ QUESTION-BY-QUESTION GRADING FULL PAGE ══════════════ */}
+      {gradingView && selectedLog && (
+        <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col overflow-hidden">
+          {/* Grading Header */}
+          <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#2c6fb7] flex items-center justify-center text-white font-bold text-lg">
+                {selectedLog.student_name.charAt(0)}
+              </div>
+              <div>
+                <h2 className="font-bold text-white text-lg">{selectedLog.student_name}</h2>
+                <p className="text-slate-400 text-xs font-mono">{selectedLog.registration_number} &bull; {selectedLog.exam_name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              {selectedLog.exam_type === 'objective' && (
+                <div className="bg-slate-700 px-4 py-2 rounded-lg text-center">
+                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Running Score</p>
+                  <p className="text-white font-black text-xl">{totalGradingScore} <span className="text-slate-400 text-sm font-medium">/ {selectedLog.max_score}</span></p>
+                </div>
+              )}
+              <button onClick={handleCloseGrading} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-1 overflow-hidden">
+            {/* Left: Question Navigator */}
+            <div className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col flex-shrink-0">
+              <div className="p-4 border-b border-slate-700">
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Questions</p>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                {selectedLog.questions.map((q, idx) => {
+                  const answered = !!selectedLog.answers[q.id];
+                  const isCurrent = idx === gradingQIndex;
+                  return (
+                    <button
+                      key={q.id}
+                      onClick={() => setGradingQIndex(idx)}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg transition-all ${isCurrent ? 'bg-[#2c6fb7] text-white' : 'text-slate-300 hover:bg-slate-700'}`}
+                    >
+                      <p className="text-xs font-bold">Q{idx + 1} &bull; {q.points} pts</p>
+                      <p className="text-[11px] opacity-70 truncate mt-0.5">{q.text.slice(0, 35)}...</p>
+                      {answered ? (
+                        <span className="text-[10px] text-emerald-400 font-bold">✓ Answered</span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500 font-bold">— No answer</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Center: Question + Answer */}
+            <div className="flex-1 flex flex-col overflow-hidden bg-slate-900">
+              {selectedLog.questions.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-slate-500">No questions in this exam.</div>
+              ) : (() => {
+                const q = selectedLog.questions[gradingQIndex];
+                const studentAns = selectedLog.answers[q.id];
+                const isCorrect = q.type === 'multiple_choice' ? studentAns === q.correct_answer : null;
+
+                return (
+                  <div className="flex-1 overflow-y-auto p-8">
+                    <div className="max-w-2xl mx-auto space-y-6">
+                      {/* Question */}
+                      <div>
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className="bg-[#2c6fb7]/20 text-[#2c6fb7] text-xs font-black px-3 py-1 rounded-full border border-[#2c6fb7]/30">
+                            Question {gradingQIndex + 1} of {selectedLog.questions.length}
+                          </span>
+                          <span className="text-slate-400 text-xs">{q.points} {q.points === 1 ? 'point' : 'points'}</span>
+                        </div>
+                        <p className="text-white text-lg font-semibold leading-relaxed">{q.text}</p>
+                      </div>
+
+                      {/* MCQ Options */}
+                      {q.type === 'multiple_choice' && q.options && (
+                        <div className="space-y-2.5">
+                          {q.options.map((opt, i) => {
+                            const isStudentChoice = studentAns === opt;
+                            const isCorrectOpt = opt === q.correct_answer;
+                            return (
+                              <div key={i} className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${
+                                isCorrectOpt ? 'border-emerald-500 bg-emerald-500/10' :
+                                isStudentChoice ? 'border-red-500 bg-red-500/10' :
+                                'border-slate-700 bg-slate-800'
+                              }`}>
+                                <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${isCorrectOpt ? 'bg-emerald-500 text-white' : isStudentChoice ? 'bg-red-500 text-white' : 'bg-slate-700 text-slate-400'}`}>
+                                  {String.fromCharCode(65 + i)}
+                                </span>
+                                <span className={`text-sm font-medium ${isCorrectOpt ? 'text-emerald-300' : isStudentChoice ? 'text-red-300' : 'text-slate-300'}`}>{opt}</span>
+                                <div className="ml-auto flex gap-2">
+                                  {isCorrectOpt && <span className="text-emerald-400 text-xs font-bold">✓ Correct</span>}
+                                  {isStudentChoice && !isCorrectOpt && <span className="text-red-400 text-xs font-bold">✗ Student's answer</span>}
+                                  {isStudentChoice && isCorrectOpt && <span className="text-emerald-400 text-xs font-bold">✓ Student answered correctly</span>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Essay Answer */}
+                      {q.type === 'essay' && (
+                        <div className="bg-slate-800 rounded-xl border border-slate-700 p-5">
+                          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">Student's Response</p>
+                          <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">
+                            {studentAns || <em className="text-slate-500">No answer submitted.</em>}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Score input for this question */}
+                      <div className="bg-slate-800 rounded-xl border border-slate-600 p-5">
+                        <label className="block text-slate-300 text-sm font-bold mb-3">
+                          Score for this question (max {q.points} pts)
+                        </label>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            min="0"
+                            max={q.points}
+                            step="0.5"
+                            value={questionScores[q.id] ?? 0}
+                            onChange={(e) => setQuestionScores(prev => ({
+                              ...prev,
+                              [q.id]: Math.min(q.points, Math.max(0, parseFloat(e.target.value) || 0))
+                            }))}
+                            className="w-28 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-bold text-lg text-center focus:outline-none focus:border-[#2c6fb7]"
+                          />
+                          <span className="text-slate-400 font-medium">/ {q.points} points</span>
+                          {q.type === 'multiple_choice' && (
+                            <button
+                              type="button"
+                              onClick={() => setQuestionScores(prev => ({ ...prev, [q.id]: isCorrect ? q.points : 0 }))}
+                              className="ml-auto text-xs bg-slate-700 hover:bg-[#2c6fb7] text-slate-300 hover:text-white px-3 py-1.5 rounded-lg font-bold transition-colors"
+                            >
+                              Auto-fill
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Navigation controls */}
+              <div className="border-t border-slate-700 p-4 flex items-center justify-between bg-slate-800 flex-shrink-0">
+                <button
+                  onClick={() => setGradingQIndex(i => Math.max(0, i - 1))}
+                  disabled={gradingQIndex === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-semibold disabled:opacity-40 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" /> Previous
+                </button>
+
+                <div className="flex gap-1.5">
+                  {selectedLog.questions.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setGradingQIndex(idx)}
+                      className={`w-2.5 h-2.5 rounded-full transition-all ${idx === gradingQIndex ? 'bg-[#2c6fb7] scale-125' : 'bg-slate-600 hover:bg-slate-400'}`}
+                    />
+                  ))}
+                </div>
+
+                {gradingQIndex < selectedLog.questions.length - 1 ? (
+                  <button
+                    onClick={() => setGradingQIndex(i => i + 1)}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white rounded-lg text-sm font-semibold transition-colors"
+                  >
+                    Next <ChevronRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => document.getElementById('final-grading-panel')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors"
+                  >
+                    Final Grade <Award className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Final Grading Panel */}
+            <div className="w-72 bg-slate-800 border-l border-slate-700 flex flex-col flex-shrink-0" id="final-grading-panel">
+              <div className="p-4 border-b border-slate-700">
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Final Evaluation</p>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+                {/* Question score summary */}
+                <div className="space-y-2">
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Score Summary</p>
+                  {selectedLog.questions.map((q, idx) => (
+                    <div key={q.id} className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400">Q{idx + 1}</span>
+                      <span className="text-white font-bold">{questionScores[q.id] ?? 0} / {q.points}</span>
+                    </div>
+                  ))}
+                  <div className="border-t border-slate-600 pt-2 flex items-center justify-between">
+                    <span className="text-slate-300 font-bold text-sm">Total</span>
+                    <span className="text-white font-black text-base">
+                      {totalGradingScore} / {selectedLog.max_score} pts
+                      &nbsp;({selectedLog.max_score > 0 ? ((totalGradingScore / selectedLog.max_score) * 100).toFixed(1) : '0'}%)
+                    </span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleGradeSubmit} className="space-y-4 border-t border-slate-700 pt-4">
+                  <div>
+                    <label className="block text-slate-300 text-xs font-bold mb-1.5">Letter Grade</label>
+                    <select
+                      value={gradeLetter}
+                      onChange={(e) => setGradeLetter(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#2c6fb7]"
+                    >
+                      <option value="A">A – Excellent (90%+)</option>
+                      <option value="B">B – Good (80–89%)</option>
+                      <option value="C">C – Satisfactory (70–79%)</option>
+                      <option value="D">D – Passing (60–69%)</option>
+                      <option value="F">F – Failed (&lt;60%)</option>
+                      <option value="Pending">Pending Review</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-slate-300 text-xs font-bold mb-1.5">Feedback & Comments</label>
+                    <textarea
+                      placeholder="Enter feedback for the student..."
+                      value={gradeFeedback}
+                      onChange={(e) => setGradeFeedback(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm h-28 resize-none focus:outline-none focus:border-[#2c6fb7]"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={gradeSubmitting}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-60"
+                  >
+                    {gradeSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
+                    {gradeSubmitting ? 'Saving...' : 'Submit Grades'}
+                  </button>
+                </form>
+
+                {/* Proctoring flags */}
+                {selectedLog.impersonation_flags > 0 && (
+                  <div className="border border-red-700 bg-red-900/30 rounded-xl p-3">
+                    <p className="text-red-400 text-xs font-bold flex items-center gap-1.5 mb-2">
+                      <ShieldAlert className="w-4 h-4" /> Proctoring Flags: {selectedLog.impersonation_flags}
+                    </p>
+                    <p className="text-red-300 text-[11px]">Review timeline for cheating incidents before finalising grade.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

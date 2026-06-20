@@ -85,7 +85,7 @@ export default function WebcamMonitor({
             screenshotFormat="image/jpeg"
             videoConstraints={videoConstraints}
             onUserMediaError={handleUserMediaError}
-            className="w-full h-full object-cover transform scale-x-[-1]"
+            className="w-full h-full object-cover"
             forceScreenshotSourceSize={true}
           />
         )}

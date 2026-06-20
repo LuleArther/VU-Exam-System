@@ -144,7 +144,7 @@ export default function SettingsForm() {
                   audio={false}
                   ref={webcamRef}
                   screenshotFormat="image/jpeg"
-                  className="w-full h-full object-cover transform scale-x-[-1]"
+                  className="w-full h-full object-cover"
                   videoConstraints={{ width: 1280, height: 720, facingMode: "user" }}
                 />
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-4">
@@ -168,7 +168,7 @@ export default function SettingsForm() {
 
             {imageSrc && !isWebcamOpen && (
               <div className="relative rounded-xl overflow-hidden border-2 border-[#2c6fb7] aspect-video">
-                <img src={imageSrc} alt="New Baseline" className="w-full h-full object-cover transform scale-x-[-1]" />
+                <img src={imageSrc} alt="New Baseline" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                   <button
                     type="button"

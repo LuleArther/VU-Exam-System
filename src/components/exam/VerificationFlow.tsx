@@ -115,6 +115,12 @@ export default function VerificationFlow({ examId }: VerifyFlowProps) {
             <ArrowLeft className="w-4 h-4 mr-1.5" />
             Cancel and Return
           </a>
+          <button 
+            onClick={handleSkip}
+            className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors underline"
+          >
+            Skip Face Verification
+          </button>
         </div>
       </div>
     </div>

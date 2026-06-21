@@ -53,8 +53,8 @@ export default function RegistrationForm() {
     }
   };
 
-  const handleRegister = async () => {
-    if (!imageSrc) {
+  const handleRegister = async (isSkip: boolean = false) => {
+    if (!isSkip && !imageSrc) {
       setError("Please capture a baseline photo.");
       return;
     }
@@ -71,7 +71,7 @@ export default function RegistrationForm() {
           email: email,
           full_name: fullName,
           password: password,
-          base64_image: imageSrc,
+          base64_image: isSkip ? "data:image/jpeg;base64," : imageSrc,
           faculty: faculty
         })
       });
@@ -253,12 +253,20 @@ export default function RegistrationForm() {
 
           <div className="flex justify-center gap-4 mt-6">
             {!imageSrc ? (
-              <button 
-                onClick={capture}
-                className="flex items-center gap-2 px-6 py-3 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white rounded-lg font-bold shadow-sm transition-colors"
-              >
-                <Camera className="w-5 h-5" /> Capture Baseline Photo
-              </button>
+              <>
+                <button 
+                  onClick={capture}
+                  className="flex items-center gap-2 px-6 py-3 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white rounded-lg font-bold shadow-sm transition-colors"
+                >
+                  <Camera className="w-5 h-5" /> Capture Baseline Photo
+                </button>
+                <button 
+                  onClick={() => handleRegister(true)}
+                  className="flex items-center gap-2 px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold transition-colors"
+                >
+                  Skip
+                </button>
+              </>
             ) : (
               <button 
                 onClick={retake}
@@ -272,7 +280,7 @@ export default function RegistrationForm() {
           {imageSrc && (
             <div className="pt-6">
               <button 
-                onClick={handleRegister}
+                onClick={() => handleRegister(false)}
                 disabled={loading}
                 className="w-full py-[14px] px-4 rounded text-[15px] font-medium text-white bg-green-600 hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
               >

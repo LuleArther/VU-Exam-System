@@ -102,6 +102,10 @@ export default function LecturerDashboard() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewQIndex, setPreviewQIndex] = useState(0);
 
+  const [timelineLog, setTimelineLog] = useState<ExamLog | null>(null);
+  const handleOpenTimeline = (log: ExamLog) => setTimelineLog(log);
+  const handleCloseTimeline = () => setTimelineLog(null);
+
   // Edit exam states
   const [editMode, setEditMode] = useState(false);
   const [allExams, setAllExams] = useState<ExamItem[]>([]);
@@ -577,9 +581,12 @@ export default function LecturerDashboard() {
                         <p className="text-[10px] text-slate-500 font-mono">{log.registration_number} &bull; {log.exam_id}</p>
                       </div>
                       {log.impersonation_flags > 0 && (
-                        <span className="ml-1 text-[10px] bg-red-100 text-red-600 font-bold px-1.5 py-0.5 rounded-full">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleOpenTimeline(log); }}
+                          className="ml-1 text-[10px] bg-red-100 text-red-600 hover:bg-red-200 font-bold px-1.5 py-0.5 rounded-full transition-colors"
+                        >
                           {log.impersonation_flags}⚠
-                        </span>
+                        </button>
                       )}
                     </button>
                   ))}
@@ -642,9 +649,12 @@ export default function LecturerDashboard() {
                         </td>
                         <td className="px-6 py-4">
                           {log.impersonation_flags > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">
+                            <button 
+                              onClick={() => handleOpenTimeline(log)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                            >
                               <ShieldAlert className="w-3.5 h-3.5" /> {log.impersonation_flags}
-                            </span>
+                            </button>
                           ) : (
                             <span className="text-slate-400 text-xs font-medium">Clean</span>
                           )}
@@ -1409,6 +1419,69 @@ export default function LecturerDashboard() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ══════════════ TIMELINE SIDEBAR ══════════════ */}
+      {timelineLog && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-end overflow-hidden">
+          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col border-l border-slate-200 animate-slide-in-right">
+            <div className="bg-red-600 px-6 py-4 flex items-center justify-between text-white flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <ShieldAlert className="w-6 h-6" />
+                <div>
+                  <h3 className="font-bold text-lg leading-tight">Proctoring Flags</h3>
+                  <p className="text-red-100 text-xs">{timelineLog.student_name} &bull; {timelineLog.exam_id}</p>
+                </div>
+              </div>
+              <button onClick={handleCloseTimeline} className="text-white hover:bg-white/20 p-1.5 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 bg-slate-50 border-b border-slate-200 flex-shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-slate-600">Total Flags</span>
+                <span className="text-lg font-black text-red-600">{timelineLog.impersonation_flags}</span>
+              </div>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                The timeline below displays all recorded incidents for this student during the examination session.
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {timelineLog.timeline && timelineLog.timeline.length > 0 ? (
+                <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-slate-200">
+                  {timelineLog.timeline.map((event, idx) => {
+                    const isFlag = event.event.includes("Mismatch") || event.event.includes("Multiple") || event.event.includes("No Face") || event.event.includes("Covered") || event.event.includes("Bypassed") || event.event.includes("Multiple Faces Detected") || event.event.includes("Camera Covered");
+                    return (
+                      <div key={idx} className="relative flex items-start gap-4">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 border-4 border-white shadow-sm z-10 ${isFlag ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'}`}>
+                          {isFlag ? <AlertCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                        </div>
+                        <div className={`flex-1 rounded-xl p-4 shadow-sm border ${isFlag ? 'bg-red-50 border-red-100' : 'bg-white border-slate-200'}`}>
+                          <div className="flex justify-between items-start mb-1">
+                            <h4 className={`text-sm font-bold ${isFlag ? 'text-red-700' : 'text-slate-700'}`}>{event.event}</h4>
+                            <span className="text-[10px] font-semibold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-100 shadow-sm">
+                              {new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className={`text-xs mt-1 leading-relaxed ${isFlag ? 'text-red-600' : 'text-slate-600'}`}>{event.details}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 flex flex-col items-center">
+                  <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mb-3">
+                    <CheckCircle className="w-8 h-8 text-emerald-500" />
+                  </div>
+                  <h4 className="text-slate-800 font-bold mb-1">No Timeline Events</h4>
+                  <p className="text-slate-500 text-sm">This student has a clean record.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

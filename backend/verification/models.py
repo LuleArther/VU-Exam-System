@@ -22,7 +22,7 @@ class Student(models.Model):
     reference_image_path = models.CharField(max_length=255)
     
     # Auth fields
-    email = models.EmailField(unique=True, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
     password = models.CharField(max_length=128, default="")
     auth_token = models.CharField(max_length=100, null=True, blank=True)
     is_active = models.BooleanField(default=False)

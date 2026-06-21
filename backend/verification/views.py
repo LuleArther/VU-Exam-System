@@ -127,8 +127,8 @@ def register(request):
     if not all([reg_number, email, full_name, password, image_b64]):
         return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)
 
-    if Student.objects.filter(registration_number=reg_number).exists() or Student.objects.filter(email=email).exists():
-        return Response({"error": "Student or Email already registered"}, status=status.HTTP_400_BAD_REQUEST)
+    if Student.objects.filter(registration_number=reg_number).exists():
+        return Response({"error": "Student with this Registration Number already exists"}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         if "," in image_b64:

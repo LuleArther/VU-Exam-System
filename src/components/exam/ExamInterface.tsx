@@ -32,7 +32,7 @@ export default function ExamInterface({ examId }: { examId: string }) {
     tab_switched:   0,               // no cooldown
     camera_covered: 0,               // no cooldown
     no_face:        2 * 60 * 1000,   // 2 minutes
-    multiple_faces: 10 * 60 * 1000,  // 10 minutes
+    multiple_faces: 0,               // no cooldown
     mismatch:       1 * 60 * 1000,   // 1 minute
   };
 

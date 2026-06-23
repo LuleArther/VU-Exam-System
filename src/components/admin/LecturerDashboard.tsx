@@ -64,13 +64,11 @@ interface StudentItem {
 
 const FACULTIES = [
   { code: 'ALL', label: 'All Students' },
-  { code: 'FST', label: 'FST – Science & Technology' },
-  { code: 'FBA', label: 'FBA – Business Administration' },
-  { code: 'FLAW', label: 'FLAW – Faculty of Law' },
-  { code: 'FED', label: 'FED – Education' },
-  { code: 'FICT', label: 'FICT – Information & Communication Technology' },
-  { code: 'FHSS', label: 'FHSS – Humanities & Social Sciences' },
-  { code: 'FMED', label: 'FMED – Faculty of Medicine' },
+  { code: 'SE', label: 'Software Engineering' },
+  { code: 'IT', label: 'Information Technology' },
+  { code: 'CS', label: 'Computer Science' },
+  { code: 'DS', label: 'Data Science' },
+  { code: 'IS', label: 'Information Systems' },
 ];
 
 export default function LecturerDashboard() {
@@ -850,7 +848,7 @@ export default function LecturerDashboard() {
                           value={mode}
                           checked={mode === 'FACULTY' ? !['ALL','SPECIFIC'].includes(assignedTo) : assignedTo === mode}
                           onChange={() => {
-                            if (mode === 'FACULTY') setAssignedTo('FST');
+                            if (mode === 'FACULTY') setAssignedTo('SE');
                             else setAssignedTo(mode);
                           }}
                           className="sr-only"
@@ -859,7 +857,7 @@ export default function LecturerDashboard() {
                           {(mode === 'FACULTY' ? !['ALL','SPECIFIC'].includes(assignedTo) : assignedTo === mode) && <div className="w-2 h-2 bg-[#2c6fb7] rounded-full" />}
                         </div>
                         <span className="text-xs font-bold">
-                          {mode === 'ALL' ? 'All Students' : mode === 'FACULTY' ? 'By Faculty' : 'Specific Students'}
+                          {mode === 'ALL' ? 'All Students' : mode === 'FACULTY' ? 'By Course' : 'Specific Students'}
                         </span>
                       </label>
                     ))}
@@ -868,7 +866,7 @@ export default function LecturerDashboard() {
                   {/* Faculty picker */}
                   {!['ALL', 'SPECIFIC'].includes(assignedTo) && (
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Select Faculty</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Select Course</label>
                       <select
                         value={assignedTo}
                         onChange={(e) => setAssignedTo(e.target.value)}
@@ -959,13 +957,30 @@ export default function LecturerDashboard() {
                               </div>
                             )}
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveQuestion(idx)}
-                            className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg border border-slate-200 transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex flex-col gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setQText(q.text);
+                                setQPoints(q.points.toString());
+                                if (q.type === 'multiple_choice') {
+                                  setQOptions(q.options || ['', '', '', '']);
+                                  setQCorrectIndex((q.options || []).indexOf(q.correct_answer || ''));
+                                }
+                                handleRemoveQuestion(idx);
+                              }}
+                              className="text-blue-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-lg border border-slate-200 transition-colors"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveQuestion(idx)}
+                              className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg border border-slate-200 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>

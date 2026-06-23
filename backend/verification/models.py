@@ -4,20 +4,18 @@ import uuid
 
 FACULTY_CHOICES = [
     ('ALL', 'All Students'),
-    ('FST', 'Faculty of Science & Technology'),
-    ('FBA', 'Faculty of Business Administration'),
-    ('FLAW', 'Faculty of Law'),
-    ('FED', 'Faculty of Education'),
-    ('FICT', 'Faculty of ICT'),
-    ('FHSS', 'Faculty of Humanities & Social Sciences'),
-    ('FMED', 'Faculty of Medicine'),
+    ('SE', 'Software Engineering'),
+    ('IT', 'Information Technology'),
+    ('CS', 'Computer Science'),
+    ('DS', 'Data Science'),
+    ('IS', 'Information Systems'),
 ]
 
 class Student(models.Model):
     registration_number = models.CharField(max_length=50, unique=True, primary_key=True)
     full_name = models.CharField(max_length=150)
     role = models.CharField(max_length=50, default="VClass Student")
-    faculty = models.CharField(max_length=10, choices=FACULTY_CHOICES, default='FST')
+    faculty = models.CharField(max_length=10, choices=FACULTY_CHOICES, default='SE')
     # Store the path to the verified student ID photo used for DeepFace reference
     reference_image_path = models.CharField(max_length=255)
     

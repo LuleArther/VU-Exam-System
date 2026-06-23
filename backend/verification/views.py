@@ -122,7 +122,7 @@ def register(request):
     full_name = data.get('full_name')
     password = data.get('password')
     image_b64 = data.get('base64_image')
-    faculty = data.get('faculty', 'FST')
+    faculty = data.get('faculty', 'SE')
 
     if not all([reg_number, email, full_name, password, image_b64]):
         return Response({"error": "Missing required fields"}, status=status.HTTP_400_BAD_REQUEST)

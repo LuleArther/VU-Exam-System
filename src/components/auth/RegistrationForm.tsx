@@ -9,13 +9,11 @@ const videoConstraints = {
 };
 
 const FACULTIES = [
-  { code: 'FST', label: 'FST – Faculty of Science & Technology' },
-  { code: 'FBA', label: 'FBA – Faculty of Business Administration' },
-  { code: 'FLAW', label: 'FLAW – Faculty of Law' },
-  { code: 'FED', label: 'FED – Faculty of Education' },
-  { code: 'FICT', label: 'FICT – Faculty of ICT' },
-  { code: 'FHSS', label: 'FHSS – Humanities & Social Sciences' },
-  { code: 'FMED', label: 'FMED – Faculty of Medicine' },
+  { code: 'SE', label: 'Software Engineering' },
+  { code: 'IT', label: 'Information Technology' },
+  { code: 'CS', label: 'Computer Science' },
+  { code: 'DS', label: 'Data Science' },
+  { code: 'IS', label: 'Information Systems' },
 ];
 
 export default function RegistrationForm() {
@@ -24,7 +22,7 @@ export default function RegistrationForm() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
-  const [faculty, setFaculty] = useState('FST');
+  const [faculty, setFaculty] = useState('SE');
   
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const webcamRef = useRef<Webcam>(null);
@@ -195,7 +193,7 @@ export default function RegistrationForm() {
             />
           </div>
           <div>
-            <label className="block text-[13px] text-slate-600 font-semibold mb-1">Faculty / Programme</label>
+            <label className="block text-[13px] text-slate-600 font-semibold mb-1">Course / Programme</label>
             <select
               required
               value={faculty}

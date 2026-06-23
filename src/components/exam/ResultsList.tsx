@@ -10,6 +10,7 @@ interface Exam {
   status: 'upcoming' | 'active' | 'completed' | 'graded';
   score?: number;
   max_score?: number;
+  grade_letter?: string;
 }
 
 export default function ResultsList() {
@@ -132,10 +133,10 @@ export default function ResultsList() {
                     return (
                       <div className="flex flex-col items-end">
                         <span className={`text-lg font-black ${colorClass}`}>
-                          {exam.score} <span className="text-sm font-semibold text-slate-400">/ {exam.max_score}</span>
+                          {exam.grade_letter || 'N/A'}
                         </span>
                         <span className={`text-xs font-bold ${colorClass}`}>
-                          {pct.toFixed(1)}%
+                          {pct.toFixed(1)}% ({exam.score}/{exam.max_score})
                         </span>
                       </div>
                     );

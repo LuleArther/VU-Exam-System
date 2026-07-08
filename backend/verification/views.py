@@ -714,6 +714,13 @@ def create_exam(request):
     return Response({"success": True, "exam_id": exam.exam_id, "created": created})
 
 
+@api_view(['DELETE'])
+def delete_exam(request, exam_id):
+    exam = get_object_or_404(Exam, exam_id=exam_id)
+    exam.delete()
+    return Response({"success": True, "message": "Exam deleted successfully"})
+
+
 @api_view(['GET'])
 def get_exam(request, exam_id):
     exam = get_object_or_404(Exam, exam_id=exam_id)

@@ -3,7 +3,7 @@ from .views import (
     verify_face, register, login, verify_continuous, dashboard_logs, update_profile,
     verify_login_code, verify_registration_code, list_exams, create_exam, get_exam,
     get_exam_full, list_all_exams, list_students,
-    start_exam, submit_exam, log_exam_event, grade_exam
+    start_exam, submit_exam, log_exam_event, grade_exam, delete_exam
 )
 
 urlpatterns = [
@@ -25,4 +25,5 @@ urlpatterns = [
     path('exams/<str:exam_id>/submit/', submit_exam, name='submit_exam'),
     path('exams/<str:exam_id>/log-event/', log_exam_event, name='log_exam_event'),
     path('exams/<str:exam_id>/grade/', grade_exam, name='grade_exam'),
+    path('exams/<str:exam_id>/delete/', delete_exam, name='delete_exam'),
 ]

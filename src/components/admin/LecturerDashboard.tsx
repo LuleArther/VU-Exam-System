@@ -239,6 +239,20 @@ export default function LecturerDashboard() {
     }
   };
 
+  const handleDeleteExam = async (id: string) => {
+    if (!window.confirm(`Are you sure you want to delete exam ${id}?`)) return;
+    try {
+      const res = await fetch(`/api/exams/${id}/delete/`, { method: 'DELETE' });
+      if (res.ok) {
+        setAllExams(prev => prev.filter(exam => exam.exam_id !== id));
+      } else {
+        alert('Failed to delete exam.');
+      }
+    } catch (err) {
+      alert('Error deleting exam.');
+    }
+  };
+
   // ─── Edit Exam Logic ──────────────────────────────────────────────────────
   const handleEditExam = async (id: string) => {
     try {
@@ -726,10 +740,8 @@ export default function LecturerDashboard() {
               {allExams.length > 0 && (
                 <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
                   {allExams.map(exam => (
-                    <button
+                    <div
                       key={exam.exam_id}
-                      type="button"
-                      onClick={() => handleEditExam(exam.exam_id)}
                       className="w-full text-left flex items-center justify-between px-5 py-4 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg transition-all group"
                     >
                       <div>
@@ -742,10 +754,23 @@ export default function LecturerDashboard() {
                           <span><span className="font-bold text-slate-400">Questions:</span> {exam.question_count}</span>
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 text-sm font-bold text-slate-400 group-hover:text-[#2c6fb7] bg-white px-3 py-1.5 border border-slate-200 rounded-md shadow-sm">
-                        <Edit3 className="w-4 h-4" /> Edit Paper
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEditExam(exam.exam_id)}
+                          className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-[#2c6fb7] bg-white px-3 py-1.5 border border-slate-200 hover:border-[#2c6fb7] rounded-md shadow-sm transition-colors"
+                        >
+                          <Edit3 className="w-4 h-4" /> Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteExam(exam.exam_id)}
+                          className="flex items-center gap-2 text-sm font-bold text-slate-400 hover:text-red-600 bg-white px-3 py-1.5 border border-slate-200 hover:border-red-600 rounded-md shadow-sm transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" /> Delete
+                        </button>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1177,262 +1202,271 @@ export default function LecturerDashboard() {
 
       {/* ══════════════ QUESTION-BY-QUESTION GRADING FULL PAGE ══════════════ */}
       {gradingView && selectedLog && (
-        <div className="fixed inset-0 bg-slate-900 z-50 flex flex-col overflow-hidden">
-          {/* Grading Header */}
-          <div className="bg-slate-800 px-6 py-4 flex items-center justify-between border-b border-slate-700 flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#2c6fb7] flex items-center justify-center text-white font-bold text-lg">
-                {selectedLog.student_name.charAt(0)}
-              </div>
-              <div>
-                <h2 className="font-bold text-white text-lg">{selectedLog.student_name}</h2>
-                <p className="text-slate-400 text-xs font-mono">{selectedLog.registration_number} &bull; {selectedLog.exam_name}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {selectedLog.exam_type === 'objective' && (
-                <div className="bg-slate-700 px-4 py-2 rounded-lg text-center">
-                  <p className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Running Score</p>
-                  <p className="text-white font-black text-xl">{totalGradingScore} <span className="text-slate-400 text-sm font-medium">/ {selectedLog.max_score}</span></p>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex flex-col overflow-hidden items-center justify-center p-4">
+          <div className="w-full max-w-7xl h-full max-h-[95vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-slate-200">
+            {/* Grading Header */}
+            <div className="bg-white px-6 py-4 flex items-center justify-between border-b border-slate-200 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#2c6fb7] flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                  {selectedLog.student_name.charAt(0)}
                 </div>
-              )}
-              <button onClick={handleCloseGrading} className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-1 overflow-hidden">
-            {/* Left: Question Navigator */}
-            <div className="w-64 bg-slate-800 border-r border-slate-700 flex flex-col flex-shrink-0">
-              <div className="p-4 border-b border-slate-700">
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Questions</p>
+                <div>
+                  <h2 className="font-bold text-slate-800 text-lg">{selectedLog.student_name}</h2>
+                  <p className="text-slate-500 text-xs font-mono">{selectedLog.registration_number} &bull; {selectedLog.exam_name}</p>
+                </div>
               </div>
-              <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
-                {selectedLog.questions.map((q, idx) => {
-                  const answered = !!selectedLog.answers[q.id];
-                  const isCurrent = idx === gradingQIndex;
-                  return (
-                    <button
-                      key={q.id}
-                      onClick={() => setGradingQIndex(idx)}
-                      className={`w-full text-left px-3 py-2.5 rounded-lg transition-all ${isCurrent ? 'bg-[#2c6fb7] text-white' : 'text-slate-300 hover:bg-slate-700'}`}
-                    >
-                      <p className="text-xs font-bold">Q{idx + 1} &bull; {q.points} pts</p>
-                      <p className="text-[11px] opacity-70 truncate mt-0.5">{q.text.slice(0, 35)}...</p>
-                      {answered ? (
-                        <span className="text-[10px] text-emerald-400 font-bold">✓ Answered</span>
-                      ) : (
-                        <span className="text-[10px] text-slate-500 font-bold">— No answer</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Center: Question + Answer */}
-            <div className="flex-1 flex flex-col overflow-hidden bg-slate-900">
-              {selectedLog.questions.length === 0 ? (
-                <div className="flex-1 flex items-center justify-center text-slate-500">No questions in this exam.</div>
-              ) : (() => {
-                const q = selectedLog.questions[gradingQIndex];
-                const studentAns = selectedLog.answers[q.id];
-                const isCorrect = q.type === 'multiple_choice' ? studentAns === q.correct_answer : null;
-
-                return (
-                  <div className="flex-1 overflow-y-auto p-8">
-                    <div className="max-w-2xl mx-auto space-y-6">
-                      {/* Question */}
-                      <div>
-                        <div className="flex items-center gap-3 mb-3">
-                          <span className="bg-[#2c6fb7]/20 text-[#2c6fb7] text-xs font-black px-3 py-1 rounded-full border border-[#2c6fb7]/30">
-                            Question {gradingQIndex + 1} of {selectedLog.questions.length}
-                          </span>
-                          <span className="text-slate-400 text-xs">{q.points} {q.points === 1 ? 'point' : 'points'}</span>
-                        </div>
-                        <p className="text-white text-lg font-semibold leading-relaxed">{q.text}</p>
-                      </div>
-
-                      {/* MCQ Options */}
-                      {q.type === 'multiple_choice' && q.options && (
-                        <div className="space-y-2.5">
-                          {q.options.map((opt, i) => {
-                            const isStudentChoice = studentAns === opt;
-                            const isCorrectOpt = opt === q.correct_answer;
-                            return (
-                              <div key={i} className={`flex items-center gap-3 p-4 rounded-xl border transition-all ${
-                                isCorrectOpt ? 'border-emerald-500 bg-emerald-500/10' :
-                                isStudentChoice ? 'border-red-500 bg-red-500/10' :
-                                'border-slate-700 bg-slate-800'
-                              }`}>
-                                <span className={`text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center ${isCorrectOpt ? 'bg-emerald-500 text-white' : isStudentChoice ? 'bg-red-500 text-white' : 'bg-slate-700 text-slate-400'}`}>
-                                  {String.fromCharCode(65 + i)}
-                                </span>
-                                <span className={`text-sm font-medium ${isCorrectOpt ? 'text-emerald-300' : isStudentChoice ? 'text-red-300' : 'text-slate-300'}`}>{opt}</span>
-                                <div className="ml-auto flex gap-2">
-                                  {isCorrectOpt && <span className="text-emerald-400 text-xs font-bold">✓ Correct</span>}
-                                  {isStudentChoice && !isCorrectOpt && <span className="text-red-400 text-xs font-bold">✗ Student's answer</span>}
-                                  {isStudentChoice && isCorrectOpt && <span className="text-emerald-400 text-xs font-bold">✓ Student answered correctly</span>}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* Essay Answer */}
-                      {q.type === 'essay' && (
-                        <div className="bg-slate-800 rounded-xl border border-slate-700 p-5">
-                          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-3">Student's Response</p>
-                          <p className="text-slate-200 text-sm leading-relaxed whitespace-pre-wrap">
-                            {studentAns || <em className="text-slate-500">No answer submitted.</em>}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Score input for this question */}
-                      <div className="bg-slate-800 rounded-xl border border-slate-600 p-5">
-                        <label className="block text-slate-300 text-sm font-bold mb-3">
-                          Score for this question (max {q.points} pts)
-                        </label>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="number"
-                            min="0"
-                            max={q.points}
-                            step="0.5"
-                            value={questionScores[q.id] ?? 0}
-                            onChange={(e) => setQuestionScores(prev => ({
-                              ...prev,
-                              [q.id]: Math.min(q.points, Math.max(0, parseFloat(e.target.value) || 0))
-                            }))}
-                            className="w-28 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white font-bold text-lg text-center focus:outline-none focus:border-[#2c6fb7]"
-                          />
-                          <span className="text-slate-400 font-medium">/ {q.points} points</span>
-                          {q.type === 'multiple_choice' && (
-                            <button
-                              type="button"
-                              onClick={() => setQuestionScores(prev => ({ ...prev, [q.id]: isCorrect ? q.points : 0 }))}
-                              className="ml-auto text-xs bg-slate-700 hover:bg-[#2c6fb7] text-slate-300 hover:text-white px-3 py-1.5 rounded-lg font-bold transition-colors"
-                            >
-                              Auto-fill
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+              <div className="flex items-center gap-3">
+                {selectedLog.exam_type === 'objective' && (
+                  <div className="bg-slate-50 px-4 py-2 rounded-lg text-center border border-slate-200">
+                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Running Score</p>
+                    <p className="text-slate-800 font-black text-xl">{totalGradingScore} <span className="text-slate-400 text-sm font-medium">/ {selectedLog.max_score}</span></p>
                   </div>
-                );
-              })()}
-
-              {/* Navigation controls */}
-              <div className="border-t border-slate-700 p-4 flex items-center justify-between bg-slate-800 flex-shrink-0">
-                <button
-                  onClick={() => setGradingQIndex(i => Math.max(0, i - 1))}
-                  disabled={gradingQIndex === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-semibold disabled:opacity-40 transition-colors"
-                >
-                  <ChevronLeft className="w-4 h-4" /> Previous
+                )}
+                <button onClick={handleCloseGrading} className="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-100 transition-colors">
+                  <X className="w-6 h-6" />
                 </button>
-
-                <div className="flex gap-1.5">
-                  {selectedLog.questions.map((_, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setGradingQIndex(idx)}
-                      className={`w-2.5 h-2.5 rounded-full transition-all ${idx === gradingQIndex ? 'bg-[#2c6fb7] scale-125' : 'bg-slate-600 hover:bg-slate-400'}`}
-                    />
-                  ))}
-                </div>
-
-                {gradingQIndex < selectedLog.questions.length - 1 ? (
-                  <button
-                    onClick={() => setGradingQIndex(i => i + 1)}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white rounded-lg text-sm font-semibold transition-colors"
-                  >
-                    Next <ChevronRight className="w-4 h-4" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => document.getElementById('final-grading-panel')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-colors"
-                  >
-                    Final Grade <Award className="w-4 h-4" />
-                  </button>
-                )}
               </div>
             </div>
 
-            {/* Right: Final Grading Panel */}
-            <div className="w-72 bg-slate-800 border-l border-slate-700 flex flex-col flex-shrink-0" id="final-grading-panel">
-              <div className="p-4 border-b border-slate-700">
-                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Final Evaluation</p>
-              </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-
-                {/* Question score summary */}
-                <div className="space-y-2">
-                  <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Score Summary</p>
-                  {selectedLog.questions.map((q, idx) => (
-                    <div key={q.id} className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400">Q{idx + 1}</span>
-                      <span className="text-white font-bold">{questionScores[q.id] ?? 0} / {q.points}</span>
-                    </div>
-                  ))}
-                  <div className="border-t border-slate-600 pt-2 flex items-center justify-between">
-                    <span className="text-slate-300 font-bold text-sm">Total</span>
-                    <span className="text-white font-black text-base">
-                      {totalGradingScore} / {selectedLog.max_score} pts
-                      &nbsp;({selectedLog.max_score > 0 ? ((totalGradingScore / selectedLog.max_score) * 100).toFixed(1) : '0'}%)
-                    </span>
-                  </div>
+            <div className="flex flex-1 overflow-hidden">
+              {/* Left: Question Navigator */}
+              <div className="w-64 bg-slate-50 border-r border-slate-200 flex flex-col flex-shrink-0">
+                <div className="p-4 border-b border-slate-200 bg-white">
+                  <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Questions</p>
                 </div>
+                <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+                  {selectedLog.questions.map((q, idx) => {
+                    const answered = !!selectedLog.answers[q.id];
+                    const isCurrent = idx === gradingQIndex;
+                    return (
+                      <button
+                        key={q.id}
+                        onClick={() => setGradingQIndex(idx)}
+                        className={`w-full text-left px-3 py-2.5 rounded-lg transition-all ${isCurrent ? 'bg-[#2c6fb7] text-white shadow-md' : 'text-slate-600 hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200'}`}
+                      >
+                        <p className="text-xs font-bold">Q{idx + 1} &bull; {q.points} pts</p>
+                        <p className={`text-[11px] truncate mt-0.5 ${isCurrent ? 'opacity-90 text-blue-100' : 'text-slate-500'}`}>{q.text.slice(0, 35)}...</p>
+                        {answered ? (
+                          <span className={`text-[10px] font-bold mt-1 block ${isCurrent ? 'text-blue-200' : 'text-emerald-600'}`}>✓ Answered</span>
+                        ) : (
+                          <span className={`text-[10px] font-bold mt-1 block ${isCurrent ? 'text-blue-200/70' : 'text-slate-400'}`}>— No answer</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-                <form onSubmit={handleGradeSubmit} className="space-y-4 border-t border-slate-700 pt-4">
-                  <div>
-                    <label className="block text-slate-300 text-xs font-bold mb-1.5">Letter Grade</label>
-                    <select
-                      value={gradeLetter}
-                      onChange={(e) => setGradeLetter(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#2c6fb7]"
-                    >
-                      <option value="A">A – Excellent (90%+)</option>
-                      <option value="B">B – Good (80–89%)</option>
-                      <option value="C">C – Satisfactory (70–79%)</option>
-                      <option value="D">D – Passing (60–69%)</option>
-                      <option value="F">F – Failed (&lt;60%)</option>
-                      <option value="Pending">Pending Review</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-slate-300 text-xs font-bold mb-1.5">Feedback & Comments</label>
-                    <textarea
-                      placeholder="Enter feedback for the student..."
-                      value={gradeFeedback}
-                      onChange={(e) => setGradeFeedback(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm h-28 resize-none focus:outline-none focus:border-[#2c6fb7]"
-                    />
-                  </div>
+              {/* Center: Question + Answer */}
+              <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                {selectedLog.questions.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center text-slate-400 font-medium">No questions in this exam.</div>
+                ) : (() => {
+                  const q = selectedLog.questions[gradingQIndex];
+                  const studentAns = selectedLog.answers[q.id];
+                  const isCorrect = q.type === 'multiple_choice' ? studentAns === q.correct_answer : null;
+
+                  return (
+                    <div className="flex-1 overflow-y-auto p-8 bg-slate-50/50">
+                      <div className="max-w-2xl mx-auto space-y-6">
+                        {/* Question */}
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                          <div className="flex items-center gap-3 mb-4">
+                            <span className="bg-[#2c6fb7]/10 text-[#2c6fb7] text-xs font-black px-3 py-1.5 rounded-full border border-[#2c6fb7]/20">
+                              Question {gradingQIndex + 1} of {selectedLog.questions.length}
+                            </span>
+                            <span className="text-slate-500 text-xs font-medium bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
+                              {q.points} {q.points === 1 ? 'point' : 'points'}
+                            </span>
+                          </div>
+                          <p className="text-slate-800 text-lg font-semibold leading-relaxed">{q.text}</p>
+                        </div>
+
+                        {/* MCQ Options */}
+                        {q.type === 'multiple_choice' && q.options && (
+                          <div className="space-y-3">
+                            {q.options.map((opt, i) => {
+                              const isStudentChoice = studentAns === opt;
+                              const isCorrectOpt = opt === q.correct_answer;
+                              return (
+                                <div key={i} className={`flex items-center gap-3 p-4 rounded-xl border transition-all shadow-sm ${
+                                  isCorrectOpt ? 'border-emerald-500 bg-emerald-50' :
+                                  isStudentChoice ? 'border-red-400 bg-red-50' :
+                                  'border-slate-200 bg-white'
+                                }`}>
+                                  <span className={`text-xs font-bold w-7 h-7 rounded-full flex items-center justify-center ${isCorrectOpt ? 'bg-emerald-500 text-white shadow-emerald-200 shadow-md' : isStudentChoice ? 'bg-red-500 text-white shadow-red-200 shadow-md' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+                                    {String.fromCharCode(65 + i)}
+                                  </span>
+                                  <span className={`text-sm font-semibold ${isCorrectOpt ? 'text-emerald-800' : isStudentChoice ? 'text-red-800' : 'text-slate-700'}`}>{opt}</span>
+                                  <div className="ml-auto flex gap-2">
+                                    {isCorrectOpt && <span className="text-emerald-600 text-xs font-bold px-2 py-1 bg-emerald-100 rounded-md">✓ Correct Answer</span>}
+                                    {isStudentChoice && !isCorrectOpt && <span className="text-red-600 text-xs font-bold px-2 py-1 bg-red-100 rounded-md">✗ Student's Answer</span>}
+                                    {isStudentChoice && isCorrectOpt && <span className="text-emerald-600 text-xs font-bold px-2 py-1 bg-emerald-100 rounded-md">✓ Student Answered Correctly</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Essay Answer */}
+                        {q.type === 'essay' && (
+                          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                            <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-3">Student's Response</p>
+                            <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap bg-slate-50 p-4 rounded-lg border border-slate-100 min-h-[100px]">
+                              {studentAns || <em className="text-slate-400">No answer submitted.</em>}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Score input for this question */}
+                        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm flex flex-col gap-3">
+                          <label className="text-slate-700 text-sm font-bold flex items-center justify-between">
+                            Score for this question
+                            <span className="text-slate-400 font-medium text-xs">Max {q.points} pts</span>
+                          </label>
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="number"
+                              min="0"
+                              max={q.points}
+                              step="0.5"
+                              value={questionScores[q.id] ?? 0}
+                              onChange={(e) => setQuestionScores(prev => ({
+                                ...prev,
+                                [q.id]: Math.min(q.points, Math.max(0, parseFloat(e.target.value) || 0))
+                              }))}
+                              className="w-28 px-4 py-2 bg-white border-2 border-slate-200 rounded-lg text-slate-800 font-black text-xl text-center focus:outline-none focus:border-[#2c6fb7] focus:ring-4 focus:ring-[#2c6fb7]/10 transition-all shadow-inner"
+                            />
+                            <span className="text-slate-500 font-medium text-lg">/ {q.points} pts</span>
+                            {q.type === 'multiple_choice' && (
+                              <button
+                                type="button"
+                                onClick={() => setQuestionScores(prev => ({ ...prev, [q.id]: isCorrect ? q.points : 0 }))}
+                                className="ml-auto text-xs bg-slate-100 hover:bg-[#2c6fb7] text-slate-600 hover:text-white px-4 py-2 rounded-lg font-bold border border-slate-200 hover:border-[#2c6fb7] transition-all shadow-sm"
+                              >
+                                Auto-fill Grade
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Navigation controls */}
+                <div className="border-t border-slate-200 p-4 flex items-center justify-between bg-white flex-shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.02)]">
                   <button
-                    type="submit"
-                    disabled={gradeSubmitting}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-1.5 disabled:opacity-60"
+                    onClick={() => setGradingQIndex(i => Math.max(0, i - 1))}
+                    disabled={gradingQIndex === 0}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-600 rounded-xl text-sm font-bold disabled:opacity-40 transition-all shadow-sm"
                   >
-                    {gradeSubmitting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Award className="w-4 h-4" />}
-                    {gradeSubmitting ? 'Saving...' : 'Submit Grades'}
+                    <ChevronLeft className="w-4 h-4" /> Previous
                   </button>
-                </form>
 
-                {/* Proctoring flags */}
-                {selectedLog.impersonation_flags > 0 && (
-                  <div className="border border-red-700 bg-red-900/30 rounded-xl p-3">
-                    <p className="text-red-400 text-xs font-bold flex items-center gap-1.5 mb-2">
-                      <ShieldAlert className="w-4 h-4" /> Proctoring Flags: {selectedLog.impersonation_flags}
-                    </p>
-                    <p className="text-red-300 text-[11px]">Review timeline for cheating incidents before finalising grade.</p>
+                  <div className="flex gap-1.5 overflow-x-auto max-w-[40%] px-2 py-1">
+                    {selectedLog.questions.map((_, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setGradingQIndex(idx)}
+                        className={`w-2.5 h-2.5 rounded-full transition-all flex-shrink-0 ${idx === gradingQIndex ? 'bg-[#2c6fb7] scale-125' : 'bg-slate-200 hover:bg-slate-400'}`}
+                      />
+                    ))}
                   </div>
-                )}
+
+                  {gradingQIndex < selectedLog.questions.length - 1 ? (
+                    <button
+                      onClick={() => setGradingQIndex(i => i + 1)}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-blue-500/20"
+                    >
+                      Next Question <ChevronRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => document.getElementById('final-grading-panel')?.scrollIntoView({ behavior: 'smooth' })}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-all shadow-md shadow-emerald-500/20"
+                    >
+                      Final Grade <Award className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: Final Grading Panel */}
+              <div className="w-80 bg-slate-50 border-l border-slate-200 flex flex-col flex-shrink-0" id="final-grading-panel">
+                <div className="p-5 border-b border-slate-200 bg-white flex-shrink-0">
+                  <p className="text-slate-800 text-sm font-bold flex items-center gap-2">
+                    <Award className="w-4 h-4 text-[#2c6fb7]" /> Final Evaluation
+                  </p>
+                </div>
+                <div className="flex-1 overflow-y-auto p-5 space-y-6">
+
+                  {/* Question score summary */}
+                  <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3">
+                    <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-2">Score Summary</p>
+                    {selectedLog.questions.map((q, idx) => (
+                      <div key={q.id} className="flex items-center justify-between text-sm border-b border-slate-50 last:border-0 pb-2 last:pb-0">
+                        <span className="text-slate-600 font-medium">Question {idx + 1}</span>
+                        <span className="text-slate-800 font-bold bg-slate-100 px-2 py-0.5 rounded">{questionScores[q.id] ?? 0} <span className="text-slate-400 text-xs">/ {q.points}</span></span>
+                      </div>
+                    ))}
+                    <div className="border-t-2 border-slate-100 pt-3 flex items-center justify-between mt-2">
+                      <span className="text-slate-800 font-black text-sm">Total Score</span>
+                      <span className="text-[#2c6fb7] font-black text-lg">
+                        {totalGradingScore} <span className="text-slate-400 text-sm font-bold">/ {selectedLog.max_score}</span>
+                        <div className="text-right text-xs text-slate-500 font-medium mt-0.5">
+                          {selectedLog.max_score > 0 ? ((totalGradingScore / selectedLog.max_score) * 100).toFixed(1) : '0'}%
+                        </div>
+                      </span>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleGradeSubmit} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-4">
+                    <div>
+                      <label className="block text-slate-700 text-xs font-bold mb-1.5">Letter Grade</label>
+                      <select
+                        value={gradeLetter}
+                        onChange={(e) => setGradeLetter(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-sm font-semibold focus:outline-none focus:border-[#2c6fb7] focus:ring-2 focus:ring-[#2c6fb7]/10 transition-all"
+                      >
+                        <option value="A">A – Excellent (90%+)</option>
+                        <option value="B">B – Good (80–89%)</option>
+                        <option value="C">C – Satisfactory (70–79%)</option>
+                        <option value="D">D – Passing (60–69%)</option>
+                        <option value="F">F – Failed (&lt;60%)</option>
+                        <option value="Pending">Pending Review</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 text-xs font-bold mb-1.5">Feedback & Comments</label>
+                      <textarea
+                        placeholder="Enter feedback for the student..."
+                        value={gradeFeedback}
+                        onChange={(e) => setGradeFeedback(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-800 text-sm h-28 resize-none focus:outline-none focus:border-[#2c6fb7] focus:ring-2 focus:ring-[#2c6fb7]/10 transition-all"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={gradeSubmitting}
+                      className="w-full py-3 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      {gradeSubmitting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Award className="w-5 h-5" />}
+                      {gradeSubmitting ? 'Publishing Grade...' : 'Publish Official Grade'}
+                    </button>
+                  </form>
+
+                  {/* Proctoring flags */}
+                  {selectedLog.impersonation_flags > 0 && (
+                    <div className="border border-red-200 bg-red-50 rounded-xl p-4 shadow-sm">
+                      <p className="text-red-700 text-sm font-bold flex items-center gap-2 mb-1.5">
+                        <ShieldAlert className="w-5 h-5" /> Flagged Incidents: {selectedLog.impersonation_flags}
+                      </p>
+                      <p className="text-red-600/80 text-xs font-medium leading-relaxed">Please review the proctoring timeline for potential cheating incidents before finalising this grade.</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

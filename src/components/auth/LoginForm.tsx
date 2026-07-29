@@ -59,6 +59,29 @@ export default function LoginForm() {
     }
   };
 
+  const [fetchingCode, setFetchingCode] = useState(false);
+
+  const handleGetCodeFromBackend = async () => {
+    setError('');
+    setFetchingCode(true);
+    try {
+      const response = await fetch('/api/get-otp-debug/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ registration_number: regNo })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not retrieve the code.');
+      }
+      setVerificationCode(data.code);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setFetchingCode(false);
+    }
+  };
+
   const handleVerificationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -123,6 +146,14 @@ export default function LoginForm() {
             onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
             className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg text-center font-bold tracking-widest text-[20px] placeholder-slate-400 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 transition-colors placeholder:text-sm placeholder:tracking-normal"
           />
+          <button
+            type="button"
+            onClick={handleGetCodeFromBackend}
+            disabled={fetchingCode}
+            className="mt-2 text-[12.5px] font-semibold text-[#2c6fb7] hover:underline disabled:opacity-50"
+          >
+            {fetchingCode ? 'Fetching code...' : "Didn't get the code? Click here to get it"}
+          </button>
         </div>
 
         <div className="pt-2 flex flex-col gap-3">
@@ -166,7 +197,7 @@ export default function LoginForm() {
       <div>
         <input 
           type="text" 
-          placeholder="Reg No (e.g. VU-AAA-1234) or Admin Email" 
+          placeholder="Reg No, Email, or Admin Email"
           required
           value={regNo}
           onChange={(e) => setRegNo(e.target.value)}

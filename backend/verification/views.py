@@ -3,6 +3,7 @@ import os
 import random
 import json
 import re
+import subprocess
 import cv2
 import numpy as np
 from rest_framework.decorators import api_view
@@ -11,6 +12,7 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.conf import settings
+from django.db.models import Q
 
 try:
     from deepface import DeepFace
@@ -109,16 +111,33 @@ def send_otp_email(to_email: str, code: str, student_name: str, purpose: str = "
     from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'onboarding@resend.dev')
 
     if resend_key:
+        # Sent via a curl subprocess rather than the resend/requests Python
+        # libraries: on some machines/networks, Python's bundled OpenSSL fails
+        # to complete the TLS handshake with Resend's (Cloudflare-fronted) API
+        # and hangs for the full request timeout, while curl (using the OS's
+        # native TLS stack) completes instantly. This sidesteps that entirely.
         try:
-            import resend
-            resend.api_key = resend_key
-            resend.Emails.send({
+            payload = json.dumps({
                 "from": f"Victoria University <{from_email}>",
                 "to": [to_email],
                 "subject": subject,
                 "html": html_body,
             })
-            print(f"[EMAIL] OTP sent to {to_email}")
+            result = subprocess.run(
+                [
+                    "curl", "-s", "--max-time", "15",
+                    "-X", "POST", "https://api.resend.com/emails",
+                    "-H", f"Authorization: Bearer {resend_key}",
+                    "-H", "Content-Type: application/json",
+                    "--data", "@-",
+                ],
+                input=payload,
+                capture_output=True, text=True, timeout=20,
+            )
+            if result.returncode == 0 and '"id"' in result.stdout:
+                print(f"[EMAIL] OTP sent to {to_email}")
+            else:
+                raise RuntimeError(f"curl exit={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}")
         except Exception as e:
             print(f"[EMAIL ERROR] Failed to send via Resend: {e}")
             print(f"[FALLBACK] OTP for {to_email}: {code}")
@@ -280,14 +299,14 @@ def update_profile(request):
 @api_view(['POST'])
 def login(request):
     data = request.data
-    reg_number = data.get('registration_number')
+    identifier = data.get('registration_number')  # accepts a registration number OR an email
     password = data.get('password')
 
-    if not reg_number or not password:
+    if not identifier or not password:
         return Response({"error": "Missing credentials"}, status=status.HTTP_400_BAD_REQUEST)
 
     # 1. Check for Admin Login
-    if reg_number == 'admin@vu.ac.ug' and password == 'admin@123':
+    if identifier == 'admin@vu.ac.ug' and password == 'admin@123':
         return Response({
             "success": True,
             "token": "admin-token-xyz-123",
@@ -295,9 +314,13 @@ def login(request):
             "role": "admin"
         })
 
-    # 2. Check for Student Login
+    # 2. Check for Student Login (by registration number or email, case-insensitive)
+    student = Student.objects.filter(
+        Q(registration_number__iexact=identifier) | Q(email__iexact=identifier)
+    ).first()
     try:
-        student = Student.objects.get(registration_number=reg_number)
+        if not student:
+            raise Student.DoesNotExist
         if student.check_password(password):
             if not student.is_active:
                 return Response({"error": "Account not verified. Please verify your email first."}, status=status.HTTP_401_UNAUTHORIZED)
@@ -309,7 +332,7 @@ def login(request):
                 defaults={'code': code, 'created_at': timezone.now()}
             )
             
-            email_to = student.email if student.email else f"{reg_number.lower()}@vu.ac.ug"
+            email_to = student.email if student.email else f"{student.registration_number.lower()}@vu.ac.ug"
             send_otp_email(email_to, code, student.full_name, purpose="login")
             
             return Response({
@@ -325,14 +348,18 @@ def login(request):
 @api_view(['POST'])
 def verify_login_code(request):
     data = request.data
-    reg_number = data.get('registration_number')
+    identifier = data.get('registration_number')  # accepts a registration number OR an email
     code = data.get('code')
 
-    if not reg_number or not code:
+    if not identifier or not code:
         return Response({"error": "Missing fields"}, status=status.HTTP_400_BAD_REQUEST)
 
+    student = Student.objects.filter(
+        Q(registration_number__iexact=identifier) | Q(email__iexact=identifier)
+    ).first()
     try:
-        student = Student.objects.get(registration_number=reg_number)
+        if not student:
+            raise Student.DoesNotExist
         otp_record = OTPVerification.objects.filter(student=student).first()
         
         if otp_record and otp_record.code == str(code):
@@ -355,6 +382,35 @@ def verify_login_code(request):
             return Response({"error": "Invalid verification code"}, status=status.HTTP_400_BAD_REQUEST)
     except Student.DoesNotExist:
         return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+
+@api_view(['POST'])
+def get_otp_debug(request):
+    """Testing aid only: returns the current OTP code directly instead of
+    relying on email delivery. Hard-gated behind DEBUG so this can never be
+    reachable once DEBUG=False is set for a real deployment — otherwise this
+    would let anyone read any student's verification code."""
+    if not settings.DEBUG:
+        return Response({"error": "Not available"}, status=status.HTTP_404_NOT_FOUND)
+
+    identifier = request.data.get('registration_number')  # accepts a registration number OR an email
+    if not identifier:
+        return Response({"error": "Missing registration_number"}, status=status.HTTP_400_BAD_REQUEST)
+
+    student = Student.objects.filter(
+        Q(registration_number__iexact=identifier) | Q(email__iexact=identifier)
+    ).first()
+    if not student:
+        return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    otp_record = OTPVerification.objects.filter(student=student).order_by('-created_at').first()
+    if not otp_record:
+        return Response({"error": "No pending verification code for this student"}, status=status.HTTP_404_NOT_FOUND)
+
+    time_diff = timezone.now() - otp_record.created_at
+    if time_diff.total_seconds() > 600:
+        return Response({"error": "Verification code expired"}, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response({"code": otp_record.code})
 
 @api_view(['POST'])
 def verify_face(request):
@@ -558,8 +614,7 @@ def verify_continuous(request):
         
         gray = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2GRAY)
         height, width = gray.shape
-        frame_area = height * width
-        
+
         avg_brightness = float(np.mean(gray))
         is_camera_covered = avg_brightness < 35
         brightness_std = float(np.std(gray))
@@ -587,7 +642,7 @@ def verify_continuous(request):
             face_cascade = cv2.CascadeClassifier(cascade_path)
             
             min_face_side = int(min(height, width) * 0.10)
-            
+
             faces = face_cascade.detectMultiScale(
                 gray,
                 scaleFactor=1.15,
@@ -595,14 +650,15 @@ def verify_continuous(request):
                 minSize=(min_face_side, min_face_side),
                 flags=cv2.CASCADE_SCALE_IMAGE
             )
-            
-            confirmed_faces = []
-            for (x, y, w, h) in faces:
-                face_area = w * h
-                if face_area >= frame_area * 0.03:
-                    confirmed_faces.append((x, y, w, h))
-            
-            num_faces = len(confirmed_faces)
+
+            # minSize above already enforces a sensible minimum face size (10% of
+            # the frame's shorter side) together with minNeighbors=10 for
+            # false-positive suppression. A prior extra filter required each face
+            # to cover 3% of the *total frame area* — roughly double what minSize
+            # allows — which silently discarded real, correctly-detected faces
+            # whenever two people shared the frame (each necessarily smaller) or
+            # a single person sat at a normal webcam distance, so it was removed.
+            num_faces = len(faces)
             
             if num_faces > 1:
                 is_verified = False

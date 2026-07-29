@@ -125,18 +125,21 @@ export default function ResultsList() {
                 <span className="font-bold text-sm">Final Score:</span>
                 {exam.status === 'graded' ? (
                   (() => {
-                    const pct = exam.max_score ? (exam.score! / exam.max_score) * 100 : 0;
+                    // exam.score is already a percentage (0-100) — the grading
+                    // form converts raw points to a percentage before saving —
+                    // so it must not be divided by max_score again here.
+                    const pct = exam.score ?? 0;
                     let colorClass = 'text-green-600';
                     if (pct < 50) colorClass = 'text-red-500';
                     else if (pct < 70) colorClass = 'text-orange-500';
-                    
+
                     return (
                       <div className="flex flex-col items-end">
                         <span className={`text-lg font-black ${colorClass}`}>
                           {exam.grade_letter || 'N/A'}
                         </span>
                         <span className={`text-xs font-bold ${colorClass}`}>
-                          {pct.toFixed(1)}% ({exam.score}/{exam.max_score})
+                          {pct.toFixed(1)}%
                         </span>
                       </div>
                     );

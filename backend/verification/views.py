@@ -2,6 +2,7 @@ import base64
 import os
 import random
 import json
+import re
 import cv2
 import numpy as np
 from rest_framework.decorators import api_view
@@ -15,6 +16,8 @@ try:
     from deepface import DeepFace
 except ImportError:
     DeepFace = None
+
+ANTI_SPOOFING_ENABLED = True
 
 from .models import Student, Exam, ExamLog, OTPVerification
 
@@ -45,10 +48,23 @@ def _warmup_deepface():
                 enforce_detection=False,
                 detector_backend="opencv",
             )
+            # Also pre-load the anti-spoofing (liveness) model so the first real
+            # registration check doesn't stall for several seconds loading it cold.
+            if ANTI_SPOOFING_ENABLED:
+                try:
+                    DeepFace.extract_faces(
+                        img_path=dummy_path,
+                        detector_backend="opencv",
+                        enforce_detection=False,
+                        anti_spoofing=True,
+                    )
+                    print("[FACE] Anti-spoofing model pre-loaded ✅", flush=True)
+                except Exception as e:
+                    print(f"[FACE] Anti-spoofing warm-up skipped: {e}", flush=True)
             if os.path.exists(dummy_path):
                 os.remove(dummy_path)
             _DEEPFACE_WARM = True
-            print("[FACE] VGG-Face model pre-loaded ✅")
+            print("[FACE] VGG-Face model pre-loaded ✅", flush=True)
         except Exception as e:
             print(f"[FACE] Warm-up skipped: {e}")
 
@@ -415,6 +431,37 @@ def verify_face(request):
         proc_path = os.path.join(TEMP_DIR, f"proc_{reg_number}.jpg")
         cv2.imwrite(proc_path, img_cv2, [cv2.IMWRITE_JPEG_QUALITY, 90])
 
+        # ── Liveness check: reject a photo or phone/screen held up to the camera ──
+        # Runs once here at the entry gate (not on every continuous frame) since the
+        # anti-spoofing model adds a few seconds of latency per check.
+        if DeepFace and ANTI_SPOOFING_ENABLED:
+            try:
+                spoof_faces = DeepFace.extract_faces(
+                    img_path=proc_path,
+                    detector_backend="opencv",
+                    enforce_detection=False,
+                    anti_spoofing=True,
+                )
+                if spoof_faces and spoof_faces[0].get("is_real") is False:
+                    if os.path.exists(proc_path):
+                        os.remove(proc_path)
+                    log, _ = ExamLog.objects.get_or_create(student=student, exam=exam)
+                    log.verification_attempts += 1
+                    log.is_verified = False
+                    log.save()
+                    return Response({
+                        "verified": False,
+                        "distance": 1.0,
+                        "threshold": threshold,
+                        "model_used": "anti-spoofing",
+                        "message": "Liveness check failed. Please use your live camera directly, not a photo or a screen."
+                    })
+            except Exception as e:
+                # If the anti-spoofing model itself fails (e.g. unexpected frame),
+                # don't block a legitimate student on a check that can't run —
+                # fall through to the normal face-match check below.
+                print(f"[FACE] Anti-spoofing check skipped: {e}")
+
         if DeepFace:
             # ── Single fast model: VGG-Face is the fastest model in DeepFace
             # and still ~90 %+ accurate. Using opencv detector (fastest).
@@ -570,19 +617,32 @@ def verify_continuous(request):
             else:
                 if DeepFace and os.path.exists(ref_path):
                     try:
+                        # Same model + threshold as the entry-gate check (verify_face) so a
+                        # student who passes registration verification isn't judged
+                        # differently mid-exam. VGG-Face is also the model kept warm in
+                        # memory at startup, so this avoids a slow cold-load on first use.
                         result = DeepFace.verify(
-                            img1_path=img_cv2, 
-                            img2_path=ref_path, 
-                            model_name="Facenet512",
-                            enforce_detection=False
+                            img1_path=img_cv2,
+                            img2_path=ref_path,
+                            model_name="VGG-Face",
+                            enforce_detection=False,
+                            detector_backend="opencv",
                         )
-                        is_verified = result.get("verified", False)
+                        distance = result.get("distance", 1.0)
+                        is_verified = distance <= 0.55
                         if not is_verified:
                             log.impersonation_flags += 1
                             event_name = "Face Mismatch"
                             details = "Face does not match the baseline profile."
-                    except Exception:
-                        is_verified = True
+                    except Exception as e:
+                        # Previously this silently treated a crashed check as a pass.
+                        # Log it and flag it instead so a genuine failure is visible
+                        # to the lecturer rather than hidden.
+                        print(f"[FACE] Continuous verify error: {e}")
+                        is_verified = False
+                        log.impersonation_flags += 1
+                        event_name = "Verification Error"
+                        details = "Face verification could not be completed on this frame."
                 else:
                     is_verified = True
 
@@ -651,7 +711,9 @@ def list_exams(request):
         status_val = "active"
         score_val = None
         max_score_val = None
-        
+        grade_letter_val = None
+        feedback_val = None
+
         if student_id:
             log = ExamLog.objects.filter(student__registration_number=student_id, exam=exam).first()
             if log and log.status in ['submitted', 'graded']:
@@ -659,6 +721,8 @@ def list_exams(request):
                 if log.status == 'graded':
                     status_val = "graded"
                 score_val = log.score
+                grade_letter_val = log.grade_letter
+                feedback_val = log.feedback
                 try:
                     questions = json.loads(exam.questions_json)
                     max_score_val = sum(q.get('points', 1) for q in questions)
@@ -682,6 +746,8 @@ def list_exams(request):
             "status": status_val,
             "score": score_val,
             "max_score": max_score_val,
+            "grade_letter": grade_letter_val,
+            "feedback": feedback_val,
             "assigned_to": exam.assigned_to
         })
     return Response({"exams": data})
@@ -691,6 +757,13 @@ def list_exams(request):
 def create_exam(request):
     data = request.data
     exam_id = data.get('exam_id')
+    # Exam ID becomes part of the student verification URL (/verify/<exam_id>),
+    # so characters like "/" would silently split it into extra path segments
+    # and 404. Strip anything that isn't a letter, digit, hyphen, or underscore.
+    if exam_id:
+        exam_id = re.sub(r'[^A-Za-z0-9_-]', '', exam_id).upper()
+        if not exam_id:
+            return Response({"error": "Exam ID must contain at least one letter or number."}, status=status.HTTP_400_BAD_REQUEST)
     title = data.get('title')
     duration_minutes = int(data.get('duration_minutes', 120))
     exam_type = data.get('exam_type', 'objective')
@@ -950,29 +1023,32 @@ def grade_exam(request, exam_id):
     score = float(request.data.get('score', 0.0))
     grade_letter = request.data.get('grade_letter', '')
     feedback = request.data.get('feedback', '')
-    
+    question_scores = request.data.get('question_scores', {})
+
     student = get_object_or_404(Student, registration_number=reg_number)
     exam = get_object_or_404(Exam, exam_id=exam_id)
-    
+
     log = get_object_or_404(ExamLog, student=student, exam=exam)
+    was_already_graded = log.status == 'graded'
     log.score = score
     log.grade_letter = grade_letter
     log.feedback = feedback
+    log.question_scores_json = json.dumps(question_scores)
     log.status = 'graded'
-    
+
     try:
         timeline = json.loads(log.timeline_json)
     except:
         timeline = []
-        
+
     timeline.append({
         "timestamp": timezone.now().isoformat(),
-        "event": "Exam Graded",
-        "details": f"Graded by lecturer. Score: {score} ({grade_letter})."
+        "event": "Grade Updated" if was_already_graded else "Exam Graded",
+        "details": f"{'Re-graded' if was_already_graded else 'Graded'} by lecturer. Score: {score} ({grade_letter})."
     })
     log.timeline_json = json.dumps(timeline)
     log.save()
-    
+
     return Response({"success": True})
 
 @api_view(['GET'])
@@ -989,7 +1065,12 @@ def dashboard_logs(request):
             answers = json.loads(log.answers_json)
         except:
             answers = {}
-            
+
+        try:
+            question_scores = json.loads(log.question_scores_json)
+        except:
+            question_scores = {}
+
         try:
             questions = json.loads(log.exam.questions_json)
             max_score = sum(q.get('points', 1) for q in questions)
@@ -1011,6 +1092,7 @@ def dashboard_logs(request):
             "is_verified": log.is_verified,
             "status": log.status,
             "score": log.score,
+            "question_scores": question_scores,
             "grade_letter": log.grade_letter,
             "feedback": log.feedback,
             "timeline": timeline,

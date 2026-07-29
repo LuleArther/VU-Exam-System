@@ -70,6 +70,7 @@ class ExamLog(models.Model):
     status = models.CharField(max_length=20, default='started')
     answers_json = models.TextField(default='{}')
     score = models.FloatField(default=0.0)
+    question_scores_json = models.TextField(default='{}')
     grade_letter = models.CharField(max_length=5, default='')
     feedback = models.TextField(default='')
     timeline_json = models.TextField(default='[]')

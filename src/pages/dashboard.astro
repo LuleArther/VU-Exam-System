@@ -36,20 +36,13 @@ import { ChevronLeft, ChevronRight, Folder, AlertCircle, Box, BookOpen } from 'l
 
         <!-- Calendar -->
         <div class="bg-white rounded-xl px-6 py-5 shadow-sm border border-slate-100">
+           <div class="flex items-center justify-between mb-4">
+             <span id="calendar-month-label" class="text-[13px] font-bold text-slate-800"></span>
+           </div>
            <div class="grid grid-cols-7 text-center text-[11px] font-bold text-slate-800 mb-5 tracking-wide">
              <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span class="text-slate-400">Sat</span><span class="text-slate-400">Sun</span>
            </div>
-           <div class="grid grid-cols-7 gap-y-6 text-center text-[13px] font-medium text-slate-700">
-             <span class="text-slate-300"></span><span class="text-slate-300"></span><span class="text-slate-300"></span><span class="text-slate-300"></span><span class="text-slate-300"></span><span class="text-slate-300"></span><span class="text-slate-400">1</span>
-             <span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span class="text-slate-400">7</span><span class="text-slate-400">8</span>
-             <span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span class="text-slate-400">14</span><span class="text-slate-400">15</span>
-             <span>16</span><span>17</span><span>18</span><span>19</span><span class="font-bold text-slate-900">20</span><span class="text-slate-400">21</span><span class="text-slate-400">22</span>
-             <span class="relative">23<div class="w-1.5 h-1.5 bg-[#2c6fb7] rounded-full absolute -bottom-2.5 left-1/2 -translate-x-1/2"></div></span>
-             <span class="relative flex justify-center">24<div class="w-1.5 h-1.5 bg-[#2c6fb7] rounded-full absolute -bottom-2.5 left-1/2 -translate-x-1/2"></div></span>
-             <span>25</span>
-             <div class="flex justify-center -mt-1"><span class="border border-[#2c6fb7] text-[#2c6fb7] rounded-lg w-7 h-7 flex items-center justify-center font-bold">26</span></div>
-             <span>27</span><span class="text-slate-400">28</span><span class="text-slate-400">29</span>
-             <span>30</span><span>31</span>
+           <div id="calendar-grid" class="grid grid-cols-7 gap-y-6 text-center text-[13px] font-medium text-slate-700">
            </div>
         </div>
 
@@ -87,5 +80,37 @@ import { ChevronLeft, ChevronRight, Folder, AlertCircle, Box, BookOpen } from 'l
       }
     }
 
+    // Render the calendar for the actual current month, with today highlighted.
+    const today = new Date();
+    const monthLabelEl = document.getElementById('calendar-month-label');
+    if (monthLabelEl) {
+      monthLabelEl.textContent = today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    const gridEl = document.getElementById('calendar-grid');
+    if (gridEl) {
+      const year = today.getFullYear();
+      const month = today.getMonth();
+      const todayDate = today.getDate();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      // JS getDay(): 0=Sun..6=Sat. Convert to a Mon-first index (0=Mon..6=Sun).
+      const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+
+      let html = '';
+      for (let i = 0; i < firstWeekday; i++) {
+        html += '<span></span>';
+      }
+      for (let day = 1; day <= daysInMonth; day++) {
+        const weekdayIndex = (firstWeekday + day - 1) % 7;
+        const isWeekend = weekdayIndex === 5 || weekdayIndex === 6;
+        const isToday = day === todayDate;
+        if (isToday) {
+          html += `<div class="flex justify-center"><span class="border border-[#2c6fb7] text-[#2c6fb7] rounded-lg w-7 h-7 flex items-center justify-center font-bold">${day}</span></div>`;
+        } else {
+          html += `<span class="${isWeekend ? 'text-slate-400' : ''}">${day}</span>`;
+        }
+      }
+      gridEl.innerHTML = html;
+    }
   });
 </script>

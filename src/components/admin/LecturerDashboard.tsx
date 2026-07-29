@@ -35,6 +35,7 @@ interface ExamLog {
   is_verified: boolean;
   status: string;
   score: number;
+  question_scores?: Record<string, number>;
   grade_letter: string;
   feedback: string;
   timeline: TimelineEvent[];
@@ -188,10 +189,11 @@ export default function LecturerDashboard() {
     setGradingQIndex(0);
     setGradeLetter(log.grade_letter || 'A');
     setGradeFeedback(log.feedback || '');
-    // Initialize question scores
+    // Restore previously entered per-question scores when re-opening a graded
+    // submission, instead of resetting them to 0 and losing prior marking.
     const initScores: Record<string, number> = {};
     log.questions.forEach(q => {
-      initScores[q.id] = 0;
+      initScores[q.id] = log.question_scores?.[q.id] ?? 0;
     });
     setQuestionScores(initScores);
     setGradingView(true);
@@ -221,13 +223,14 @@ export default function LecturerDashboard() {
           registration_number: selectedLog.registration_number,
           score: totalScore,
           grade_letter: gradeLetter,
-          feedback: gradeFeedback
+          feedback: gradeFeedback,
+          question_scores: questionScores
         })
       });
 
       if (response.ok) {
         await fetchLogs();
-        alert('Grading submitted successfully!');
+        alert(selectedLog.status === 'graded' ? 'Grade updated successfully!' : 'Grading submitted successfully!');
         handleCloseGrading();
       } else {
         alert('Failed to save grading.');
@@ -815,9 +818,10 @@ export default function LecturerDashboard() {
                       placeholder="e.g., DBMS201"
                       required
                       value={examId}
-                      onChange={(e) => setExamId(e.target.value)}
+                      onChange={(e) => setExamId(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))}
                       className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-400"
                     />
+                    <p className="mt-1 text-xs text-slate-400">Letters, numbers, hyphens and underscores only — this becomes part of the student's exam link, so slashes, spaces and other symbols are stripped automatically.</p>
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-bold text-slate-700 mb-1.5">Exam Title</label>
@@ -1453,7 +1457,9 @@ export default function LecturerDashboard() {
                       className="w-full py-3 bg-[#2c6fb7] hover:bg-[#1a5ba0] text-white rounded-xl font-bold text-sm shadow-md shadow-blue-500/20 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                     >
                       {gradeSubmitting ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Award className="w-5 h-5" />}
-                      {gradeSubmitting ? 'Publishing Grade...' : 'Publish Official Grade'}
+                      {gradeSubmitting
+                        ? (selectedLog.status === 'graded' ? 'Updating Grade...' : 'Publishing Grade...')
+                        : (selectedLog.status === 'graded' ? 'Update Grade' : 'Publish Official Grade')}
                     </button>
                   </form>
 
@@ -1463,7 +1469,14 @@ export default function LecturerDashboard() {
                       <p className="text-red-700 text-sm font-bold flex items-center gap-2 mb-1.5">
                         <ShieldAlert className="w-5 h-5" /> Flagged Incidents: {selectedLog.impersonation_flags}
                       </p>
-                      <p className="text-red-600/80 text-xs font-medium leading-relaxed">Please review the proctoring timeline for potential cheating incidents before finalising this grade.</p>
+                      <p className="text-red-600/80 text-xs font-medium leading-relaxed mb-3">Please review the proctoring timeline for potential cheating incidents before finalising this grade.</p>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenTimeline(selectedLog)}
+                        className="w-full inline-flex justify-center items-center gap-2 py-2 px-4 rounded-lg text-xs font-bold text-red-700 bg-white border border-red-300 hover:bg-red-100 transition-colors"
+                      >
+                        <Clock className="w-4 h-4" /> View Proctoring Timeline
+                      </button>
                     </div>
                   )}
                 </div>
